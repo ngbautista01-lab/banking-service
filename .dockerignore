@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.gitignore
+coverage
+README.md
+docs
+postman
+test
+npm-debug.log

@@ -1,6 +1,28 @@
 version: '3.9'
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: banking_app
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: banking
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ELASTICSEARCH_NODE: http://elasticsearch:9200
+    ports:
+      - '3000:3000'
+
   postgres:
     image: postgres:15
     container_name: banking_postgres
@@ -26,8 +48,12 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - '9200:9200'
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
 
 volumes:
   postgres_data:
+  elasticsearch_data:
