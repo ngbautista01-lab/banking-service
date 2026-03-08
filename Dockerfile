@@ -1,16 +1,15 @@
-FROM node:20-alpine
-
+FROM node:20-bookworm-slim
 WORKDIR /app
 
-ENV NODE_ENV=production
-
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 
 RUN npx tsc -p tsconfig.build.json
 
+ENV NODE_ENV=production
+
 EXPOSE 3000
 
-CMD ["node", "dist/src/scripts/startup.js"]
+CMD ["node", "dist/scripts/startup.js"]
