@@ -21,7 +21,6 @@ export class ClientResolver {
   async search(@Args('input') input: SearchClientsInput) {
     return this.clientService.search(input);
   }
-u
   @Mutation(() => ClientEntity)
   async createClient(@Args('input') input: CreateClientInput) {
     return this.clientService.create(input);

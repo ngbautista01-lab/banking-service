@@ -2,7 +2,9 @@ import { AppException } from '../../../common/errors/app.exception';
 import { ClientEntity } from './client.entity';
 
 export class ClientRules {
-  static ensureIsUnique(existingClient: ClientEntity | null): void {
+  static ensureIsUnique(
+    existingClient: Pick<ClientEntity, 'id'> | null,
+  ): void {
     if (existingClient) {
       throw new AppException('CLIENT_ALREADY_EXISTS');
     }
