@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
-import { ILike, In, Repository } from 'typeorm';
+import { ILike, In, Not, Repository } from 'typeorm';
 import { AppException } from '../../../common/errors/app.exception';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
 import { SearchService } from '../../../infrastructure/search/search.service';
-import { CreateClientInput, SearchClientsInput } from './client.dto';
+import {
+  CreateClientInput,
+  SearchClientsInput,
+  UpdateClientInput,
+} from './client.dto';
 import { ClientEntity } from '../domain/client.entity';
 import { ClientRules } from '../domain/client.rules';
 
@@ -105,6 +109,57 @@ export class ClientService {
     });
   }
 
+  async update(input: UpdateClientInput): Promise<ClientEntity> {
+    const client = await this.getClientOrThrow(input.id);
+
+    const nextDocumentNumber =
+      input.documentNumber !== undefined
+        ? ClientRules.normalizeDocumentNumber(input.documentNumber)
+        : client.documentNumber;
+    const nextEmail = input.email ?? client.email;
+
+    const existingClient = await this.clientRepository.findOne({
+      where: [
+        { email: nextEmail, id: Not(client.id) },
+        { documentNumber: nextDocumentNumber, id: Not(client.id) },
+      ],
+    });
+
+    ClientRules.ensureIsUnique(existingClient);
+    ClientRules.validateDocumentNumber(nextDocumentNumber);
+
+    const mergedClient = this.clientRepository.merge(client, {
+      firstName: input.firstName ?? client.firstName,
+      lastName: input.lastName ?? client.lastName,
+      email: nextEmail,
+      documentNumber: nextDocumentNumber,
+      phone:
+        input.phone !== undefined
+          ? ClientRules.normalizePhone(input.phone)
+          : client.phone,
+      status: input.status ?? client.status,
+    });
+
+    const savedClient = await this.clientRepository.save(mergedClient);
+    await Promise.all([
+      this.cacheClient(savedClient),
+      this.searchService.indexClient(savedClient),
+    ]);
+
+    return savedClient;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const client = await this.getClientOrThrow(id);
+    await this.clientRepository.remove(client);
+    await Promise.all([
+      this.cacheService.del(this.clientCacheKey(id)),
+      this.cacheService.del(this.collectionCacheKey()),
+      this.searchService.removeClient(id),
+    ]);
+    return true;
+  }
+
   private async cacheClient(client: ClientEntity): Promise<void> {
     await Promise.all([
       this.cacheService.set(this.clientCacheKey(client.id), client, 120),
@@ -118,5 +173,18 @@ export class ClientService {
 
   private collectionCacheKey(): string {
     return 'clients:all';
+  }
+
+  private async getClientOrThrow(id: string): Promise<ClientEntity> {
+    if (!id || !isUuid(id)) {
+      throw new AppException('CLIENT_NOT_FOUND');
+    }
+
+    const client = await this.clientRepository.findOne({ where: { id } });
+    if (!client) {
+      throw new AppException('CLIENT_NOT_FOUND');
+    }
+
+    return client;
   }
 }

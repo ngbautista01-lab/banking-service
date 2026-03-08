@@ -38,6 +38,23 @@ export class SearchService {
     }
   }
 
+  async removeClient(id: string): Promise<void> {
+    if (!this.client) {
+      return;
+    }
+
+    try {
+      await this.client.delete({
+        index: this.indexName,
+        id,
+        refresh: 'wait_for',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown search error';
+      this.logger.warn(`Unable to delete client ${id} from index: ${message}`);
+    }
+  }
+
   async searchClients(term: string): Promise<string[]> {
     if (!this.client) {
       return [];
