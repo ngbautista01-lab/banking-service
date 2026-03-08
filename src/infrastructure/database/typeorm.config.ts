@@ -1,6 +1,7 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { ClientEntity } from '../../modules/clients/domain/client.entity';
 import { CreateBankingSchema1700000000000 } from './migrations/1700000000000-CreateBankingSchema';
+import { AddBlockedClientStatus1700000000001 } from './migrations/1700000000001-AddBlockedClientStatus';
 
 export const typeOrmConfig: DataSourceOptions = {
   type: 'postgres',
@@ -10,7 +11,10 @@ export const typeOrmConfig: DataSourceOptions = {
   password: process.env.DB_PASSWORD ?? 'postgres',
   database: process.env.DB_NAME ?? 'banking',
   entities: [ClientEntity],
-  migrations: [CreateBankingSchema1700000000000],
+  migrations: [
+    CreateBankingSchema1700000000000,
+    AddBlockedClientStatus1700000000001,
+  ],
   synchronize: false,
   logging: false,
 };

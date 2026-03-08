@@ -6,11 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-
-export enum ClientStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-}
+import { ClientStatus } from './client.types';
 
 registerEnumType(ClientStatus, {
   name: 'ClientStatus',

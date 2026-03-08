@@ -1,6 +1,6 @@
 import { Field, InputType } from '@nestjs/graphql';
 import { IsEmail, IsEnum, IsNotEmpty, Length } from 'class-validator';
-import { ClientStatus } from '../domain/client.entity';
+import { ClientStatus } from '../domain/client.types';
 
 @InputType()
 export class CreateClientInput {

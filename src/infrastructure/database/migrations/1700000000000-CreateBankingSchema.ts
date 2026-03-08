@@ -5,7 +5,7 @@ export class CreateBankingSchema1700000000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TYPE client_status_enum AS ENUM ('ACTIVE', 'INACTIVE');
+      CREATE TYPE client_status_enum AS ENUM ('ACTIVE', 'INACTIVE', 'BLOCKED');
 
       CREATE TABLE clients (
         id uuid PRIMARY KEY,
