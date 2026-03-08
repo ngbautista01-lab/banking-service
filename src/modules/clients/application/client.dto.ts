@@ -20,7 +20,7 @@ export class CreateClientInput {
 
   @Field()
   @IsNotEmpty()
-  @Length(5, 25)
+  @Length(9, 15)
   documentNumber!: string;
 
   @Field()

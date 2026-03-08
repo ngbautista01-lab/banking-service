@@ -6,14 +6,6 @@ describe('ClientRules', () => {
     expect(() =>
       ClientRules.ensureIsUnique({
         id: '1',
-        firstName: 'Ana',
-        lastName: 'Perez',
-        email: 'ana@example.com',
-        documentNumber: '001',
-        phone: '8095550101',
-        status: 'ACTIVE' as never,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }),
     ).toThrow(AppException);
   });

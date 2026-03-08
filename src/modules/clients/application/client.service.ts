@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { v4 as uuidv4, validate as isUuid } from 'uuid';
 import { ILike, In, Repository } from 'typeorm';
 import { AppException } from '../../../common/errors/app.exception';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
@@ -30,7 +31,11 @@ export class ClientService {
     ClientRules.validateDocumentNumber(normalizedDocumentNumber);
 
     const client = this.clientRepository.create({
-      ...input,
+      id: uuidv4(),
+      firstName: input.firstName,
+      lastName: input.lastName,
+      email: input.email,
+      status: input.status,
       documentNumber: normalizedDocumentNumber,
       phone: ClientRules.normalizePhone(input.phone),
     });
@@ -59,6 +64,10 @@ export class ClientService {
   }
 
   async findById(id: string): Promise<ClientEntity> {
+    if (!id || !isUuid(id)) {
+      throw new AppException('CLIENT_NOT_FOUND');
+    }
+
     const cacheKey = this.clientCacheKey(id);
     const cachedClient = await this.cacheService.get<ClientEntity>(cacheKey);
     if (cachedClient) {
