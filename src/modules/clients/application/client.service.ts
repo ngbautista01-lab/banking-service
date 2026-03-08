@@ -1,7 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Inject, Injectable } from '@nestjs/common';
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
-import { ILike, In, Not, Repository } from 'typeorm';
 import { AppException } from '../../../common/errors/app.exception';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
 import { SearchService } from '../../../infrastructure/search/search.service';
@@ -10,14 +8,18 @@ import {
   SearchClientsInput,
   UpdateClientInput,
 } from './client.dto';
+import {
+  CLIENT_REPOSITORY,
+  ClientRepository,
+} from './ports/client.repository';
 import { ClientEntity } from '../domain/client.entity';
 import { ClientRules } from '../domain/client.rules';
 
 @Injectable()
 export class ClientService {
   constructor(
-    @InjectRepository(ClientEntity)
-    private readonly clientRepository: Repository<ClientEntity>,
+    @Inject(CLIENT_REPOSITORY)
+    private readonly clientRepository: ClientRepository,
     private readonly cacheService: CacheService,
     private readonly searchService: SearchService,
   ) {}
@@ -27,8 +29,9 @@ export class ClientService {
       input.documentNumber,
     );
 
-    const existingClient = await this.clientRepository.findOne({
-      where: [{ email: input.email }, { documentNumber: normalizedDocumentNumber }],
+    const existingClient = await this.clientRepository.findDuplicate({
+      email: input.email,
+      documentNumber: normalizedDocumentNumber,
     });
 
     ClientRules.ensureIsUnique(existingClient);
@@ -59,9 +62,7 @@ export class ClientService {
       return cachedClients;
     }
 
-    const clients = await this.clientRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+    const clients = await this.clientRepository.findAll();
 
     await this.cacheService.set(cacheKey, clients, 60);
     return clients;
@@ -78,7 +79,7 @@ export class ClientService {
       return cachedClient;
     }
 
-    const client = await this.clientRepository.findOne({ where: { id } });
+    const client = await this.clientRepository.findById(id);
     if (!client) {
       throw new AppException('CLIENT_NOT_FOUND');
     }
@@ -90,23 +91,10 @@ export class ClientService {
   async search(input: SearchClientsInput): Promise<ClientEntity[]> {
     const ids = await this.searchService.searchClients(input.term);
     if (ids.length > 0) {
-      return this.clientRepository.find({
-        where: { id: In(ids) },
-        order: { createdAt: 'DESC' },
-      });
+      return this.clientRepository.findByIds(ids);
     }
 
-    return this.clientRepository.find({
-      where: [
-        { firstName: ILike(`%${input.term}%`) },
-        { lastName: ILike(`%${input.term}%`) },
-        { email: ILike(`%${input.term}%`) },
-        { documentNumber: ILike(`%${input.term}%`) },
-        { phone: ILike(`%${input.term}%`) },
-      ],
-      order: { createdAt: 'DESC' },
-      take: 20,
-    });
+    return this.clientRepository.searchByTerm(input.term);
   }
 
   async update(input: UpdateClientInput): Promise<ClientEntity> {
@@ -118,17 +106,17 @@ export class ClientService {
         : client.documentNumber;
     const nextEmail = input.email ?? client.email;
 
-    const existingClient = await this.clientRepository.findOne({
-      where: [
-        { email: nextEmail, id: Not(client.id) },
-        { documentNumber: nextDocumentNumber, id: Not(client.id) },
-      ],
+    const existingClient = await this.clientRepository.findDuplicate({
+      email: nextEmail,
+      documentNumber: nextDocumentNumber,
+      excludeId: client.id,
     });
 
     ClientRules.ensureIsUnique(existingClient);
     ClientRules.validateDocumentNumber(nextDocumentNumber);
 
-    const mergedClient = this.clientRepository.merge(client, {
+    const mergedClient = this.clientRepository.create({
+      ...client,
       firstName: input.firstName ?? client.firstName,
       lastName: input.lastName ?? client.lastName,
       email: nextEmail,
@@ -180,7 +168,7 @@ export class ClientService {
       throw new AppException('CLIENT_NOT_FOUND');
     }
 
-    const client = await this.clientRepository.findOne({ where: { id } });
+    const client = await this.clientRepository.findById(id);
     if (!client) {
       throw new AppException('CLIENT_NOT_FOUND');
     }
