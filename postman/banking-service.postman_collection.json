@@ -1,0 +1,236 @@
+{
+  "info": {
+    "_postman_id": "4f4d8e9f-7044-4e95-bd40-8f4113d3df11",
+    "name": "bankin service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "codex"
+  },
+  "item": [
+    {
+      "name": "clientes",
+      "item": [
+        {
+          "name": "Create Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.createClient).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('client was created', function () {",
+                  "  pm.expect(response.data.createClient.id).to.be.a('string');",
+                  "  pm.expect(response.data.createClient.email).to.eql('ana.perez@example.com');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('clientId', response.data.createClient.id);",
+                  "pm.variables.set('clientId', response.data.createClient.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('clientId', response.data.createClient.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateClient($input: CreateClientInput!) { createClient(input: $input) { id firstName lastName documentNumber email phone status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"firstName\": \"Ana\",\n      \"lastName\": \"Perez\",\n      \"documentNumber\": \"001-1234567-8\",\n      \"email\": \"ana.perez@example.com\",\n      \"phone\": \"8095550101\",\n      \"status\": \"ACTIVE\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "List Clients",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "});",
+                  "",
+                  "pm.test('clients array exists', function () {",
+                  "  pm.expect(response.data.clients).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { clients { id firstName lastName documentNumber email phone status createdAt updatedAt } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Get Client By Id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clientId = pm.collectionVariables.get('clientId') || pm.environment.get('clientId') || pm.variables.get('clientId');",
+                  "if (!clientId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('clientId is empty. Run Create Client first.');",
+                  "}",
+                  "pm.variables.set('clientId', clientId);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('clientId', clientId);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.client).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('returned client matches environment id', function () {",
+                  "  const clientId = pm.collectionVariables.get('clientId') || pm.environment.get('clientId') || pm.variables.get('clientId');",
+                  "  pm.expect(response.data.client.id).to.eql(clientId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query Client($id: String!) { client(id: $id) { id firstName lastName documentNumber email phone status createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{clientId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Search Clients",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "});",
+                  "",
+                  "pm.test('search returns an array', function () {",
+                  "  pm.expect(response.data.searchClients).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query SearchClients($input: SearchClientsInput!) { searchClients(input: $input) { id firstName lastName documentNumber email phone status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"term\": \"ana\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "clientId",
+      "value": ""
+    }
+  ]
+}
