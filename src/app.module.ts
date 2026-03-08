@@ -16,7 +16,7 @@ import { AppController } from './app.controller';
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
-      playground: true,
+      playground: false,
       sortSchema: true,
       formatError: (_formattedError, error): GraphQLFormattedError => {
         const graphQLError =
