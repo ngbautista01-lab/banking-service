@@ -1,4 +1,4 @@
-import { Field, InputType } from '@nestjs/graphql';
+import { Field, InputType, PartialType } from '@nestjs/graphql';
 import { IsEmail, IsEnum, IsNotEmpty, Length } from 'class-validator';
 import { ClientStatus } from '../domain/client.types';
 
@@ -39,4 +39,11 @@ export class SearchClientsInput {
   @IsNotEmpty()
   @Length(2, 80)
   term!: string;
+}
+
+@InputType()
+export class UpdateClientInput extends PartialType(CreateClientInput) {
+  @Field()
+  @IsNotEmpty()
+  id!: string;
 }

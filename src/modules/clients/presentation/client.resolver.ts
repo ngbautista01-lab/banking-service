@@ -1,6 +1,10 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { ClientService } from '../application/client.service';
-import { CreateClientInput, SearchClientsInput } from '../application/client.dto';
+import {
+  CreateClientInput,
+  SearchClientsInput,
+  UpdateClientInput,
+} from '../application/client.dto';
 import { ClientEntity } from '../domain/client.entity';
 
 @Resolver(() => ClientEntity)
@@ -24,5 +28,15 @@ export class ClientResolver {
   @Mutation(() => ClientEntity)
   async createClient(@Args('input') input: CreateClientInput) {
     return this.clientService.create(input);
+  }
+
+  @Mutation(() => ClientEntity)
+  async updateClient(@Args('input') input: UpdateClientInput) {
+    return this.clientService.update(input);
+  }
+
+  @Mutation(() => Boolean)
+  async deleteClient(@Args('id', { type: () => String }) id: string) {
+    return this.clientService.remove(id);
   }
 }

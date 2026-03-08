@@ -21,19 +21,28 @@ import { AppController } from './app.controller';
       formatError: (_formattedError, error): GraphQLFormattedError => {
         const graphQLError =
           typeof error === 'object' && error !== null
-            ? (error as { originalError?: unknown })
+            ? (error as {
+                originalError?: unknown;
+                extensions?: { originalError?: unknown; code?: string };
+              })
             : undefined;
+        const originalErrorCandidate =
+          graphQLError?.originalError ?? graphQLError?.extensions?.originalError;
         const originalError =
-          typeof graphQLError?.originalError === 'object' &&
-          graphQLError.originalError !== null
-            ? (graphQLError.originalError as {
+          typeof originalErrorCandidate === 'object' &&
+          originalErrorCandidate !== null
+            ? (originalErrorCandidate as {
                 response?: { code?: string };
                 status?: number;
+                code?: string;
+                message?: string;
               })
             : undefined;
 
         const code =
           originalError?.response?.code ??
+          originalError?.code ??
+          graphQLError?.extensions?.code ??
           ErrorCatalog.INTERNAL_ERROR.code;
         const statusCode =
           originalError?.status ?? ErrorCatalog.INTERNAL_ERROR.httpStatus;
