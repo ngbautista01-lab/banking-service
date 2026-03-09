@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Client } from '@elastic/elasticsearch';
+import { AccountEntity } from '../../modules/accounts/domain/account.entity';
 import { ClientEntity } from '../../modules/clients/domain/client.entity';
 
 type IndexedClient = Pick<
@@ -7,10 +8,16 @@ type IndexedClient = Pick<
   'id' | 'firstName' | 'lastName' | 'email' | 'documentNumber' | 'phone' | 'status'
 >;
 
+type IndexedAccount = Pick<
+  AccountEntity,
+  'id' | 'clientId' | 'accountNumber' | 'alias' | 'currency' | 'balance' | 'status'
+>;
+
 @Injectable()
 export class SearchService {
   private readonly logger = new Logger(SearchService.name);
-  private readonly indexName = 'clients';
+  private readonly clientIndexName = 'clients';
+  private readonly accountIndexName = 'accounts';
   private readonly client?: Client;
 
   constructor() {
@@ -27,7 +34,7 @@ export class SearchService {
 
     try {
       await this.client.index({
-        index: this.indexName,
+        index: this.clientIndexName,
         id: entry.id,
         document: entry,
         refresh: 'wait_for',
@@ -45,7 +52,7 @@ export class SearchService {
 
     try {
       await this.client.delete({
-        index: this.indexName,
+        index: this.clientIndexName,
         id,
         refresh: 'wait_for',
       });
@@ -62,7 +69,7 @@ export class SearchService {
 
     try {
       const response = await this.client.search<IndexedClient>({
-        index: this.indexName,
+        index: this.clientIndexName,
         query: {
           multi_match: {
             query: term,
@@ -77,6 +84,67 @@ export class SearchService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown search error';
       this.logger.warn(`Search unavailable, falling back to database query: ${message}`);
+      return [];
+    }
+  }
+
+  async indexAccount(entry: IndexedAccount): Promise<void> {
+    if (!this.client) {
+      return;
+    }
+
+    try {
+      await this.client.index({
+        index: this.accountIndexName,
+        id: entry.id,
+        document: entry,
+        refresh: 'wait_for',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown search error';
+      this.logger.warn(`Unable to index account ${entry.id}: ${message}`);
+    }
+  }
+
+  async removeAccount(id: string): Promise<void> {
+    if (!this.client) {
+      return;
+    }
+
+    try {
+      await this.client.delete({
+        index: this.accountIndexName,
+        id,
+        refresh: 'wait_for',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown search error';
+      this.logger.warn(`Unable to delete account ${id} from index: ${message}`);
+    }
+  }
+
+  async searchAccounts(term: string): Promise<string[]> {
+    if (!this.client) {
+      return [];
+    }
+
+    try {
+      const response = await this.client.search<IndexedAccount>({
+        index: this.accountIndexName,
+        query: {
+          multi_match: {
+            query: term,
+            fields: ['accountNumber^2', 'alias', 'clientId', 'currency', 'status'],
+          },
+        },
+      });
+
+      return response.hits.hits
+        .map((hit) => hit._source?.id)
+        .filter((value): value is string => Boolean(value));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown search error';
+      this.logger.warn(`Account search unavailable, falling back to database query: ${message}`);
       return [];
     }
   }
