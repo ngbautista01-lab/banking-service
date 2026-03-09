@@ -37,9 +37,28 @@ export const CommonErrors = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+export const AccountErrors = {
+  ACCOUNT_ALREADY_EXISTS: {
+    code: 'ACCOUNT_ALREADY_EXISTS',
+    message: 'Account already exists',
+    httpStatus: HttpStatus.CONFLICT,
+  },
+  ACCOUNT_NOT_FOUND: {
+    code: 'ACCOUNT_NOT_FOUND',
+    message: 'Account was not found',
+    httpStatus: HttpStatus.NOT_FOUND,
+  },
+  INVALID_ACCOUNT_NUMBER: {
+    code: 'INVALID_ACCOUNT_NUMBER',
+    message: 'Account number is invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 export const ErrorCatalog = {
   ...ClientErrors,
   ...CommonErrors,
+  ...AccountErrors,
 } as const;
 
 export type ErrorCatalogKey = keyof typeof ErrorCatalog;

@@ -13,6 +13,19 @@
           "name": "Create Client",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = String(Date.now()).slice(-9);",
+                  "const uniqueDocumentNumber = suffix.padStart(9, '1');",
+                  "const uniqueEmail = `ana.perez+${Date.now()}@example.com`;",
+                  "pm.collectionVariables.set('uniqueDocumentNumber', uniqueDocumentNumber);",
+                  "pm.collectionVariables.set('uniqueEmail', uniqueEmail);"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -31,7 +44,7 @@
                   "",
                   "pm.test('client was created', function () {",
                   "  pm.expect(response.data.createClient.id).to.be.a('string');",
-                  "  pm.expect(response.data.createClient.email).to.eql('ana.perez@example.com');",
+                  "  pm.expect(response.data.createClient.email).to.eql(pm.collectionVariables.get('uniqueEmail'));",
                   "});",
                   "",
                   "pm.collectionVariables.set('clientId', response.data.createClient.id);",
@@ -53,7 +66,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateClient($input: CreateClientInput!) { createClient(input: $input) { id firstName lastName documentNumber email phone status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"firstName\": \"Ana\",\n      \"lastName\": \"Perez\",\n      \"documentNumber\": \"001-1234567-8\",\n      \"email\": \"ana.perez@example.com\",\n      \"phone\": \"8095550101\",\n      \"status\": \"ACTIVE\"\n    }\n  }\n}",
+              "raw": "{\n  \"query\": \"mutation CreateClient($input: CreateClientInput!) { createClient(input: $input) { id firstName lastName documentNumber email phone status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"firstName\": \"Ana\",\n      \"lastName\": \"Perez\",\n      \"documentNumber\": \"{{uniqueDocumentNumber}}\",\n      \"email\": \"{{uniqueEmail}}\",\n      \"phone\": \"8095550101\",\n      \"status\": \"ACTIVE\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -175,6 +188,69 @@
           }
         },
         {
+          "name": "Update Client",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clientId = pm.collectionVariables.get('clientId') || pm.environment.get('clientId') || pm.variables.get('clientId');",
+                  "if (!clientId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('clientId is empty. Run Create Client first.');",
+                  "}",
+                  "pm.variables.set('clientId', clientId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.updateClient).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('client was updated', function () {",
+                  "  pm.expect(response.data.updateClient.id).to.eql(pm.variables.get('clientId'));",
+                  "  pm.expect(response.data.updateClient.firstName).to.eql('Ana Maria');",
+                  "  pm.expect(response.data.updateClient.status).to.eql('BLOCKED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdateClient($input: UpdateClientInput!) { updateClient(input: $input) { id firstName lastName documentNumber email phone status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"id\": \"{{clientId}}\",\n      \"firstName\": \"Ana Maria\",\n      \"status\": \"BLOCKED\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
           "name": "Search Clients",
           "event": [
             {
@@ -219,6 +295,427 @@
             },
             "url": "{{baseUrl}}/graphql"
           }
+        },
+        {
+          "name": "Delete Client",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clientId = pm.collectionVariables.get('clientId') || pm.environment.get('clientId') || pm.variables.get('clientId');",
+                  "if (!clientId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('clientId is empty. Run Create Client first.');",
+                  "}",
+                  "pm.variables.set('clientId', clientId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.deleteClient).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.unset('clientId');",
+                  "if (pm.environment) {",
+                  "  pm.environment.unset('clientId');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DeleteClient($id: String!) { deleteClient(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{clientId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cuentas",
+      "item": [
+        {
+          "name": "Create Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clientId = pm.collectionVariables.get('clientId') || pm.environment.get('clientId') || pm.variables.get('clientId');",
+                  "if (!clientId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('clientId is empty. Run Create Client first.');",
+                  "}",
+                  "const suffix = String(Date.now()).slice(-8);",
+                  "const uniqueAccountNumber = `ACC${suffix}`;",
+                  "pm.variables.set('clientId', clientId);",
+                  "pm.collectionVariables.set('uniqueAccountNumber', uniqueAccountNumber);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.createAccount).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('account was created', function () {",
+                  "  pm.expect(response.data.createAccount.id).to.be.a('string');",
+                  "  pm.expect(response.data.createAccount.accountNumber).to.eql(pm.collectionVariables.get('uniqueAccountNumber'));",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accountId', response.data.createAccount.id);",
+                  "pm.variables.set('accountId', response.data.createAccount.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('accountId', response.data.createAccount.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateAccount($input: CreateAccountInput!) { createAccount(input: $input) { id clientId accountNumber alias currency balance status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"clientId\": \"{{clientId}}\",\n      \"accountNumber\": \"{{uniqueAccountNumber}}\",\n      \"alias\": \"Cuenta principal\",\n      \"currency\": \"DOP\",\n      \"balance\": 1500,\n      \"status\": \"ACTIVE\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "List Accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "});",
+                  "",
+                  "pm.test('accounts array exists', function () {",
+                  "  pm.expect(response.data.accounts).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { accounts { id clientId accountNumber alias currency balance status createdAt updatedAt } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Get Account By Id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accountId = pm.collectionVariables.get('accountId') || pm.environment.get('accountId') || pm.variables.get('accountId');",
+                  "if (!accountId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('accountId is empty. Run Create Account first.');",
+                  "}",
+                  "pm.variables.set('accountId', accountId);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('accountId', accountId);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.account).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('returned account matches environment id', function () {",
+                  "  const accountId = pm.collectionVariables.get('accountId') || pm.environment.get('accountId') || pm.variables.get('accountId');",
+                  "  pm.expect(response.data.account.id).to.eql(accountId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query Account($id: String!) { account(id: $id) { id clientId accountNumber alias currency balance status createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{accountId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Update Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accountId = pm.collectionVariables.get('accountId') || pm.environment.get('accountId') || pm.variables.get('accountId');",
+                  "if (!accountId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('accountId is empty. Run Create Account first.');",
+                  "}",
+                  "pm.variables.set('accountId', accountId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.updateAccount).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('account was updated', function () {",
+                  "  pm.expect(response.data.updateAccount.id).to.eql(pm.variables.get('accountId'));",
+                  "  pm.expect(response.data.updateAccount.alias).to.eql('Cuenta operativa');",
+                  "  pm.expect(response.data.updateAccount.status).to.eql('BLOCKED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdateAccount($input: UpdateAccountInput!) { updateAccount(input: $input) { id clientId accountNumber alias currency balance status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"id\": \"{{accountId}}\",\n      \"alias\": \"Cuenta operativa\",\n      \"balance\": 2000,\n      \"status\": \"BLOCKED\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Search Accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "});",
+                  "",
+                  "pm.test('search returns an array', function () {",
+                  "  pm.expect(response.data.searchAccounts).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query SearchAccounts($input: SearchAccountsInput!) { searchAccounts(input: $input) { id clientId accountNumber alias currency balance status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"term\": \"Cuenta\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Delete Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accountId = pm.collectionVariables.get('accountId') || pm.environment.get('accountId') || pm.variables.get('accountId');",
+                  "if (!accountId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('accountId is empty. Run Create Account first.');",
+                  "}",
+                  "pm.variables.set('accountId', accountId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.deleteAccount).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.unset('accountId');",
+                  "pm.collectionVariables.unset('uniqueAccountNumber');",
+                  "if (pm.environment) {",
+                  "  pm.environment.unset('accountId');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DeleteAccount($id: String!) { deleteAccount(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{accountId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
         }
       ]
     }
@@ -230,6 +727,14 @@
     },
     {
       "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "accountId",
+      "value": ""
+    },
+    {
+      "key": "uniqueAccountNumber",
       "value": ""
     }
   ]
