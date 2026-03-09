@@ -1,4 +1,4 @@
-import { AppDataSource } from '../infrastructure/database/typeorm.config';
+import AppDataSource from '../infrastructure/database/typeorm.config';
 import { ClientEntity } from '../modules/clients/domain/client.entity';
 import { ClientRules } from '../modules/clients/domain/client.rules';
 import { ClientStatus } from '../modules/clients/domain/client.types';
