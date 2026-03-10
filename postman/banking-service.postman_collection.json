@@ -406,9 +406,12 @@
                   "});",
                   "",
                   "pm.collectionVariables.set('accountId', response.data.createAccount.id);",
+                  "pm.collectionVariables.set('sourceAccountId', response.data.createAccount.id);",
                   "pm.variables.set('accountId', response.data.createAccount.id);",
+                  "pm.variables.set('sourceAccountId', response.data.createAccount.id);",
                   "if (pm.environment) {",
                   "  pm.environment.set('accountId', response.data.createAccount.id);",
+                  "  pm.environment.set('sourceAccountId', response.data.createAccount.id);",
                   "}"
                 ]
               }
@@ -718,6 +721,562 @@
           }
         }
       ]
+    },
+    {
+      "name": "transacciones",
+      "item": [
+        {
+          "name": "Create Destination Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clientId = pm.collectionVariables.get('clientId') || pm.environment.get('clientId') || pm.variables.get('clientId');",
+                  "if (!clientId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('clientId is empty. Run Create Client first.');",
+                  "}",
+                  "const suffix = String(Date.now()).slice(-8);",
+                  "const uniqueDestinationAccountNumber = `DST${suffix}`;",
+                  "pm.variables.set('clientId', clientId);",
+                  "pm.collectionVariables.set('uniqueDestinationAccountNumber', uniqueDestinationAccountNumber);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.createAccount).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('destination account was created', function () {",
+                  "  pm.expect(response.data.createAccount.id).to.be.a('string');",
+                  "  pm.expect(response.data.createAccount.accountNumber).to.eql(pm.collectionVariables.get('uniqueDestinationAccountNumber'));",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('destinationAccountId', response.data.createAccount.id);",
+                  "pm.variables.set('destinationAccountId', response.data.createAccount.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('destinationAccountId', response.data.createAccount.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateAccount($input: CreateAccountInput!) { createAccount(input: $input) { id clientId accountNumber alias currency balance status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"clientId\": \"{{clientId}}\",\n      \"accountNumber\": \"{{uniqueDestinationAccountNumber}}\",\n      \"alias\": \"Cuenta destino\",\n      \"currency\": \"DOP\",\n      \"balance\": 0,\n      \"status\": \"ACTIVE\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Create Deposit Completed",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const sourceAccountId = pm.collectionVariables.get('sourceAccountId') || pm.environment.get('sourceAccountId') || pm.variables.get('sourceAccountId');",
+                  "if (!sourceAccountId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('sourceAccountId is empty. Run Create Account first.');",
+                  "}",
+                  "const suffix = String(Date.now()).slice(-8);",
+                  "const reference = `DEP-${suffix}`;",
+                  "pm.variables.set('sourceAccountId', sourceAccountId);",
+                  "pm.collectionVariables.set('depositReference', reference);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.createTransaction).to.exist;",
+                  "});",
+                  "pm.test('deposit completed with balance snapshots', function () {",
+                  "  const tx = response.data.createTransaction;",
+                  "  pm.expect(tx.type).to.eql('deposit');",
+                  "  pm.expect(tx.status).to.eql('COMPLETED');",
+                  "  pm.expect(tx.sourceCurrentBalance).to.be.above(tx.sourcePreviousBalance);",
+                  "});",
+                  "pm.collectionVariables.set('transactionId', response.data.createTransaction.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"type\": \"deposit\",\n      \"channel\": \"web\",\n      \"currency\": \"DOP\",\n      \"amount\": 500,\n      \"reference\": \"{{depositReference}}\",\n      \"description\": \"Deposito completado\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Create Withdrawal Completed",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const sourceAccountId = pm.collectionVariables.get('sourceAccountId') || pm.environment.get('sourceAccountId') || pm.variables.get('sourceAccountId');",
+                  "if (!sourceAccountId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('sourceAccountId is empty. Run Create Account first.');",
+                  "}",
+                  "const suffix = String(Date.now()).slice(-8);",
+                  "const reference = `WTD-${suffix}`;",
+                  "pm.variables.set('sourceAccountId', sourceAccountId);",
+                  "pm.collectionVariables.set('withdrawalReference', reference);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.createTransaction).to.exist;",
+                  "});",
+                  "pm.test('withdrawal completed with lower balance', function () {",
+                  "  const tx = response.data.createTransaction;",
+                  "  pm.expect(tx.type).to.eql('withdrawal');",
+                  "  pm.expect(tx.status).to.eql('COMPLETED');",
+                  "  pm.expect(tx.sourceCurrentBalance).to.be.below(tx.sourcePreviousBalance);",
+                  "});",
+                  "pm.collectionVariables.set('transactionId', response.data.createTransaction.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"type\": \"withdrawal\",\n      \"channel\": \"atm\",\n      \"currency\": \"DOP\",\n      \"amount\": 100,\n      \"reference\": \"{{withdrawalReference}}\",\n      \"description\": \"Retiro completado\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Create Transfer Completed",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const sourceAccountId = pm.collectionVariables.get('sourceAccountId') || pm.environment.get('sourceAccountId') || pm.variables.get('sourceAccountId');",
+                  "const destinationAccountId = pm.collectionVariables.get('destinationAccountId') || pm.environment.get('destinationAccountId') || pm.variables.get('destinationAccountId');",
+                  "if (!sourceAccountId || !destinationAccountId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('sourceAccountId or destinationAccountId is empty. Run Create Account and Create Destination Account first.');",
+                  "}",
+                  "const suffix = String(Date.now()).slice(-8);",
+                  "const reference = `TRF-${suffix}`;",
+                  "pm.variables.set('sourceAccountId', sourceAccountId);",
+                  "pm.variables.set('destinationAccountId', destinationAccountId);",
+                  "pm.collectionVariables.set('transferReference', reference);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.createTransaction).to.exist;",
+                  "});",
+                  "pm.test('transfer completed with source and destination snapshots', function () {",
+                  "  const tx = response.data.createTransaction;",
+                  "  pm.expect(tx.type).to.eql('transfer');",
+                  "  pm.expect(tx.status).to.eql('COMPLETED');",
+                  "  pm.expect(tx.sourceCurrentBalance).to.be.below(tx.sourcePreviousBalance);",
+                  "  pm.expect(tx.destinationCurrentBalance).to.be.above(tx.destinationPreviousBalance);",
+                  "});",
+                  "pm.collectionVariables.set('transactionId', response.data.createTransaction.id);",
+                  "pm.collectionVariables.set('transferTransactionId', response.data.createTransaction.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('transferTransactionId', response.data.createTransaction.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"destinationAccountId\": \"{{destinationAccountId}}\",\n      \"type\": \"transfer\",\n      \"channel\": \"mobile\",\n      \"currency\": \"DOP\",\n      \"amount\": 200,\n      \"reference\": \"{{transferReference}}\",\n      \"description\": \"Transferencia completada\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Reverse Transfer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const transactionId = pm.collectionVariables.get('transferTransactionId') || pm.environment.get('transferTransactionId') || pm.variables.get('transferTransactionId');",
+                  "if (!transactionId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('transferTransactionId is empty. Run Create Transfer Completed first.');",
+                  "}",
+                  "pm.variables.set('transactionId', transactionId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.updateTransaction).to.exist;",
+                  "});",
+                  "pm.test('transfer was reversed', function () {",
+                  "  const tx = response.data.updateTransaction;",
+                  "  pm.expect(tx.status).to.eql('REVERSED');",
+                  "  pm.expect(tx.sourceCurrentBalance).to.be.above(tx.sourcePreviousBalance);",
+                  "  pm.expect(tx.destinationCurrentBalance).to.be.below(tx.destinationPreviousBalance);",
+                  "});",
+                  "pm.collectionVariables.set('transactionId', response.data.updateTransaction.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdateTransaction($input: UpdateTransactionInput!) { updateTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"id\": \"{{transactionId}}\",\n      \"status\": \"REVERSED\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "List Transactions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "});",
+                  "",
+                  "pm.test('transactions array exists', function () {",
+                  "  pm.expect(response.data.transactions).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { transactions { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Get Transaction By Id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const transactionId = pm.collectionVariables.get('transactionId') || pm.environment.get('transactionId') || pm.variables.get('transactionId');",
+                  "if (!transactionId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('transactionId is empty. Run Create Transaction first.');",
+                  "}",
+                  "pm.variables.set('transactionId', transactionId);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('transactionId', transactionId);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.transaction).to.exist;",
+                  "});",
+                  "",
+                  "pm.test('returned transaction matches environment id', function () {",
+                  "  const transactionId = pm.collectionVariables.get('transactionId') || pm.environment.get('transactionId') || pm.variables.get('transactionId');",
+                  "  pm.expect(response.data.transaction.id).to.eql(transactionId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query Transaction($id: String!) { transaction(id: $id) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{transactionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Search Transactions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "});",
+                  "",
+                  "pm.test('search returns an array', function () {",
+                  "  pm.expect(response.data.searchTransactions).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query SearchTransactions($input: SearchTransactionsInput!) { searchTransactions(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"term\": \"TRF\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Delete Transaction",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const transactionId = pm.collectionVariables.get('transactionId') || pm.environment.get('transactionId') || pm.variables.get('transactionId');",
+                  "if (!transactionId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('transactionId is empty. Run Create Transaction first.');",
+                  "}",
+                  "pm.variables.set('transactionId', transactionId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data).to.not.be.null;",
+                  "  pm.expect(response.data.deleteTransaction).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.unset('transactionId');",
+                  "pm.collectionVariables.unset('uniqueTransactionReference');",
+                  "if (pm.environment) {",
+                  "  pm.environment.unset('transactionId');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DeleteTransaction($id: String!) { deleteTransaction(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{transactionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -734,7 +1293,43 @@
       "value": ""
     },
     {
+      "key": "sourceAccountId",
+      "value": ""
+    },
+    {
       "key": "uniqueAccountNumber",
+      "value": ""
+    },
+    {
+      "key": "transactionId",
+      "value": ""
+    },
+    {
+      "key": "uniqueTransactionReference",
+      "value": ""
+    },
+    {
+      "key": "destinationAccountId",
+      "value": ""
+    },
+    {
+      "key": "uniqueDestinationAccountNumber",
+      "value": ""
+    },
+    {
+      "key": "depositReference",
+      "value": ""
+    },
+    {
+      "key": "withdrawalReference",
+      "value": ""
+    },
+    {
+      "key": "transferReference",
+      "value": ""
+    },
+    {
+      "key": "transferTransactionId",
       "value": ""
     }
   ]
