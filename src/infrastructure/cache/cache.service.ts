@@ -53,6 +53,10 @@ export class CacheService implements OnModuleDestroy {
     this.fallbackStore.delete(key);
   }
 
+  getStatus(): 'redis' | 'memory' {
+    return this.redis?.status === 'ready' ? 'redis' : 'memory';
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.redis?.quit();
   }
