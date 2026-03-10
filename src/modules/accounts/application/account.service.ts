@@ -72,12 +72,6 @@ export class AccountService {
       throw new AppException('ACCOUNT_NOT_FOUND');
     }
 
-    const cacheKey = this.accountCacheKey(id);
-    const cachedAccount = await this.cacheService.get<AccountEntity>(cacheKey);
-    if (cachedAccount) {
-      return cachedAccount;
-    }
-
     const account = await this.accountRepository.findById(id);
     if (!account) {
       throw new AppException('ACCOUNT_NOT_FOUND');

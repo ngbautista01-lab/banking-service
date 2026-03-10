@@ -72,12 +72,6 @@ export class ClientService {
       throw new AppException('CLIENT_NOT_FOUND');
     }
 
-    const cacheKey = this.clientCacheKey(id);
-    const cachedClient = await this.cacheService.get<ClientEntity>(cacheKey);
-    if (cachedClient) {
-      return cachedClient;
-    }
-
     const client = await this.clientRepository.findOne({ where: { id } });
     if (!client) {
       throw new AppException('CLIENT_NOT_FOUND');
