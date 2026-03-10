@@ -150,11 +150,11 @@ export class AccountService {
   }
 
   private accountCacheKey(id: string): string {
-    return `account:${id}`;
+    return `account:v2:${id}`;
   }
 
   private collectionCacheKey(): string {
-    return 'accounts:all';
+    return 'accounts:v2:all';
   }
 
   private async getAccountOrThrow(id: string): Promise<AccountEntity> {

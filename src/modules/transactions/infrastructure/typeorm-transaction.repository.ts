@@ -61,8 +61,11 @@ export class TypeOrmTransactionRepository implements TransactionRepository {
   searchByTerm(term: string): Promise<TransactionEntity[]> {
     return this.repository.find({
       where: [
+        { id: ILike(`%${term}%`) },
         { reference: ILike(`%${term}%`) },
         { description: ILike(`%${term}%`) },
+        { sourceAccountId: ILike(`%${term}%`) },
+        { destinationAccountId: ILike(`%${term}%`) },
       ],
       relations: { exchangeDetails: true },
       order: { createdAt: 'DESC' },

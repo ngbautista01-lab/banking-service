@@ -461,11 +461,11 @@ export class TransactionService {
   }
 
   private transactionCacheKey(id: string): string {
-    return `transaction:${id}`;
+    return `transaction:v2:${id}`;
   }
 
   private collectionCacheKey(): string {
-    return 'transactions:all';
+    return 'transactions:v2:all';
   }
 
   private async getTransactionOrThrow(id: string): Promise<TransactionEntity> {
@@ -638,6 +638,6 @@ export class TransactionService {
       ]),
     );
 
-    await this.cacheService.del('accounts:all');
+    await this.cacheService.del('accounts:v2:all');
   }
 }
