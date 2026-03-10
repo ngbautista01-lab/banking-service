@@ -182,13 +182,6 @@ export class TransactionService {
       throw new AppException('TRANSACTION_NOT_FOUND');
     }
 
-    const cacheKey = this.transactionCacheKey(id);
-    const cachedTransaction =
-      await this.cacheService.get<TransactionEntity>(cacheKey);
-    if (cachedTransaction) {
-      return cachedTransaction;
-    }
-
     const transaction = await this.transactionRepository.findById(id);
     if (!transaction) {
       throw new AppException('TRANSACTION_NOT_FOUND');
