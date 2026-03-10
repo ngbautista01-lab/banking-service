@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { validate as isUuid, v4 as uuidv4 } from 'uuid';
 import { AppException } from '../../../common/errors/app.exception';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
@@ -14,7 +14,15 @@ import {
   AccountBalanceContextPort,
 } from '../../accounts/application/ports/account-balance-context.port';
 import { AccountEntity } from '../../accounts/domain/account.entity';
-import { TransactionBalanceOrchestrator } from './transaction-balance.orchestrator';
+import { CurrencyConversionOutput } from '../../exchange/application/exchange.dto';
+import {
+  EXCHANGE_CONTEXT_PORT,
+  ExchangeContextPort,
+} from '../../exchange/application/ports/exchange-context.port';
+import {
+  TransactionExecutionOrchestrator,
+  TransactionExecutionResult,
+} from './transaction-execution.orchestrator';
 import {
   CreateTransactionInput,
   SearchTransactionsInput,
@@ -24,6 +32,7 @@ import {
   TRANSACTION_REPOSITORY,
   TransactionRepository,
 } from './ports/transaction.repository';
+import { TransactionExchangeDetailEntity } from '../domain/transaction-exchange-detail.entity';
 import { TransactionEntity } from '../domain/transaction.entity';
 import { TransactionRules } from '../domain/transaction.rules';
 import { TransactionStatus, TransactionType } from '../domain/transaction.types';
@@ -37,7 +46,9 @@ export class TransactionService {
     private readonly transactionRepository: TransactionRepository,
     @Inject(ACCOUNT_BALANCE_CONTEXT_PORT)
     private readonly accountBalanceContextPort: AccountBalanceContextPort,
-    private readonly transactionBalanceOrchestrator: TransactionBalanceOrchestrator,
+    @Inject(EXCHANGE_CONTEXT_PORT)
+    private readonly exchangeContextPort: ExchangeContextPort,
+    private readonly transactionExecutionOrchestrator: TransactionExecutionOrchestrator,
     private readonly cacheService: CacheService,
     private readonly searchService: SearchService,
   ) {}
@@ -63,6 +74,9 @@ export class TransactionService {
     const savedTransaction = await this.dataSource.transaction(async (manager) => {
       const accountRepository = manager.getRepository(AccountEntity);
       const transactionTypeOrmRepository = manager.getRepository(TransactionEntity);
+      const exchangeDetailRepository = manager.getRepository(
+        TransactionExchangeDetailEntity,
+      );
 
       const sourceAccount = await this.getAccountOrThrow(
         input.sourceAccountId,
@@ -90,11 +104,14 @@ export class TransactionService {
         reference: normalizedReference,
         description: input.description ?? null,
         status: input.status,
+        exchangeDetails: null,
         sourcePreviousBalance: sourceAccount.balance,
         sourceCurrentBalance: sourceAccount.balance,
         destinationPreviousBalance: destinationAccount?.balance ?? null,
         destinationCurrentBalance: destinationAccount?.balance ?? null,
       });
+
+      let executionResult: TransactionExecutionResult | undefined;
 
       if (transaction.status === TransactionStatus.COMPLETED) {
         const sourceAccountContext =
@@ -102,16 +119,26 @@ export class TransactionService {
         const destinationAccountContext = destinationAccount
           ? this.accountBalanceContextPort.create(destinationAccount)
           : null;
-        const balanceEffects = TransactionRules.executeMovement(transaction);
-        const balanceSnapshots = this.transactionBalanceOrchestrator.applyEffects(
-          balanceEffects,
+
+        executionResult = await this.transactionExecutionOrchestrator.execute({
           transaction,
           sourceAccountContext,
           destinationAccountContext,
+          exchangeContext: this.createExchangeContext(
+            sourceAccount,
+            destinationAccount,
+          ),
+        });
+
+        this.applyExecutionSnapshots(
+          transaction,
+          executionResult.balanceSnapshots,
+          sourceAccount,
+          destinationAccount,
+          sourceAccountContext,
+          destinationAccountContext,
         );
-        this.syncAccountBalance(sourceAccount, sourceAccountContext);
-        this.syncAccountBalance(destinationAccount, destinationAccountContext);
-        this.assignBalanceSnapshots(transaction, balanceSnapshots);
+
         await accountRepository.save(
           destinationAccount
             ? [sourceAccount, destinationAccount]
@@ -119,7 +146,17 @@ export class TransactionService {
         );
       }
 
-      return transactionTypeOrmRepository.save(transaction);
+      const saved = await transactionTypeOrmRepository.save(transaction);
+      await this.persistExchangeDetails(
+        exchangeDetailRepository,
+        saved,
+        executionResult?.exchangeDetails,
+      );
+
+      return this.loadTransactionOrThrow(
+        saved.id,
+        transactionTypeOrmRepository,
+      );
     });
 
     await this.syncTransactionState(savedTransaction);
@@ -204,13 +241,13 @@ export class TransactionService {
     const savedTransaction = await this.dataSource.transaction(async (manager) => {
       const accountRepository = manager.getRepository(AccountEntity);
       const transactionTypeOrmRepository = manager.getRepository(TransactionEntity);
-      const persistedTransaction = await transactionTypeOrmRepository.findOne({
-        where: { id: transaction.id },
-      });
-
-      if (!persistedTransaction) {
-        throw new AppException('TRANSACTION_NOT_FOUND');
-      }
+      const exchangeDetailRepository = manager.getRepository(
+        TransactionExchangeDetailEntity,
+      );
+      const persistedTransaction = await this.loadTransactionOrThrow(
+        transaction.id,
+        transactionTypeOrmRepository,
+      );
 
       const nextTransaction = transactionTypeOrmRepository.create({
         ...persistedTransaction,
@@ -228,6 +265,7 @@ export class TransactionService {
         reference: nextReference,
         description: input.description ?? persistedTransaction.description,
         status: input.status ?? persistedTransaction.status,
+        exchangeDetails: persistedTransaction.exchangeDetails ?? null,
         sourcePreviousBalance: persistedTransaction.sourcePreviousBalance,
         sourceCurrentBalance: persistedTransaction.sourceCurrentBalance,
         destinationPreviousBalance:
@@ -241,6 +279,7 @@ export class TransactionService {
       );
 
       const affectedAccounts: AccountEntity[] = [];
+      let executionResult: TransactionExecutionResult | undefined;
 
       if (
         TransactionRules.shouldApplyMovement(
@@ -266,17 +305,27 @@ export class TransactionService {
           ? this.accountBalanceContextPort.create(destinationAccount)
           : null;
 
-        const balanceEffects = TransactionRules.executeMovement(nextTransaction);
-        const balanceSnapshots = this.transactionBalanceOrchestrator.applyEffects(
-          balanceEffects,
+        executionResult = await this.transactionExecutionOrchestrator.execute({
+          transaction: nextTransaction,
+          sourceAccountContext,
+          destinationAccountContext,
+          exchangeContext: this.createExchangeContext(
+            sourceAccount,
+            destinationAccount,
+          ),
+        });
+
+        this.applyExecutionSnapshots(
           nextTransaction,
+          executionResult.balanceSnapshots,
+          sourceAccount,
+          destinationAccount,
           sourceAccountContext,
           destinationAccountContext,
         );
-        this.syncAccountBalance(sourceAccount, sourceAccountContext);
-        this.syncAccountBalance(destinationAccount, destinationAccountContext);
-        this.assignBalanceSnapshots(nextTransaction, balanceSnapshots);
-        affectedAccounts.push(...this.compactAccounts(sourceAccount, destinationAccount));
+        affectedAccounts.push(
+          ...this.compactAccounts(sourceAccount, destinationAccount),
+        );
       }
 
       if (
@@ -303,18 +352,28 @@ export class TransactionService {
           ? this.accountBalanceContextPort.create(destinationAccount)
           : null;
 
-        const balanceEffects =
-          TransactionRules.reverseExecutedMovement(persistedTransaction);
-        const balanceSnapshots = this.transactionBalanceOrchestrator.applyEffects(
-          balanceEffects,
-          persistedTransaction,
+        await this.transactionExecutionOrchestrator.reverse({
+          transaction: {
+            ...persistedTransaction,
+            convertedAmount:
+              persistedTransaction.exchangeDetails?.convertedAmount ?? null,
+          },
           sourceAccountContext,
           destinationAccountContext,
+        }).then((result) => {
+          this.applyExecutionSnapshots(
+            nextTransaction,
+            result.balanceSnapshots,
+            sourceAccount,
+            destinationAccount,
+            sourceAccountContext,
+            destinationAccountContext,
+          );
+        });
+
+        affectedAccounts.push(
+          ...this.compactAccounts(sourceAccount, destinationAccount),
         );
-        this.syncAccountBalance(sourceAccount, sourceAccountContext);
-        this.syncAccountBalance(destinationAccount, destinationAccountContext);
-        this.assignBalanceSnapshots(nextTransaction, balanceSnapshots);
-        affectedAccounts.push(...this.compactAccounts(sourceAccount, destinationAccount));
       }
 
       if (affectedAccounts.length === 0) {
@@ -336,7 +395,7 @@ export class TransactionService {
 
         this.assignBalanceSnapshots(
           nextTransaction,
-          this.accountBalanceContextPort.snapshot(
+          this.transactionExecutionOrchestrator.captureSnapshots(
             sourceAccountContext,
             destinationAccountContext,
           ),
@@ -347,7 +406,17 @@ export class TransactionService {
         await accountRepository.save(affectedAccounts);
       }
 
-      return transactionTypeOrmRepository.save(nextTransaction);
+      const saved = await transactionTypeOrmRepository.save(nextTransaction);
+      await this.persistExchangeDetails(
+        exchangeDetailRepository,
+        saved,
+        executionResult?.exchangeDetails,
+      );
+
+      return this.loadTransactionOrThrow(
+        saved.id,
+        transactionTypeOrmRepository,
+      );
     });
 
     await this.syncTransactionState(savedTransaction);
@@ -405,6 +474,18 @@ export class TransactionService {
     }
 
     const transaction = await this.transactionRepository.findById(id);
+    if (!transaction) {
+      throw new AppException('TRANSACTION_NOT_FOUND');
+    }
+
+    return transaction;
+  }
+
+  private async loadTransactionOrThrow(
+    id: string,
+    repository: Repository<TransactionEntity>,
+  ): Promise<TransactionEntity> {
+    const transaction = await repository.findOne({ where: { id } });
     if (!transaction) {
       throw new AppException('TRANSACTION_NOT_FOUND');
     }
@@ -470,6 +551,68 @@ export class TransactionService {
       destinationSnapshot?.previousBalance ?? null;
     transaction.destinationCurrentBalance =
       destinationSnapshot?.currentBalance ?? null;
+  }
+
+  private createExchangeContext(
+    sourceAccount: Pick<AccountEntity, 'currency'>,
+    destinationAccount: Pick<AccountEntity, 'currency'> | null,
+  ) {
+    if (!destinationAccount) {
+      return null;
+    }
+
+    return this.exchangeContextPort.createContext({
+      baseCurrency: sourceAccount.currency,
+      quoteCurrency: destinationAccount.currency,
+    });
+  }
+
+  private applyExecutionSnapshots(
+    transaction: TransactionEntity,
+    snapshots: AccountBalanceSnapshot[],
+    sourceAccount: AccountEntity,
+    destinationAccount: AccountEntity | null,
+    sourceAccountContext: AccountBalanceContext,
+    destinationAccountContext: AccountBalanceContext | null,
+  ): void {
+    const sourceSnapshot = snapshots.find(
+      (snapshot) => snapshot.accountId === transaction.sourceAccountId,
+    );
+
+    this.syncAccountBalance(sourceAccount, sourceAccountContext);
+    this.syncAccountBalance(destinationAccount, destinationAccountContext);
+    this.assignBalanceSnapshots(transaction, snapshots);
+
+    if (!sourceSnapshot) {
+      throw new AppException('INVALID_TRANSACTION_ACCOUNTS');
+    }
+  }
+
+  private async persistExchangeDetails(
+    repository: Repository<TransactionExchangeDetailEntity>,
+    transaction: TransactionEntity,
+    exchangeDetails?: CurrencyConversionOutput | null,
+  ): Promise<void> {
+    const existing = await repository.findOne({
+      where: { transactionId: transaction.id },
+    });
+
+    if (!exchangeDetails) {
+      transaction.exchangeDetails = existing ?? null;
+      return;
+    }
+
+    const detail = repository.create({
+      transactionId: transaction.id,
+      baseCurrency: exchangeDetails.baseCurrency,
+      quoteCurrency: exchangeDetails.quoteCurrency,
+      sourceAmount: exchangeDetails.amount,
+      rate: exchangeDetails.rate,
+      convertedAmount: exchangeDetails.convertedAmount,
+      effectiveAt: exchangeDetails.effectiveAt,
+    });
+
+    transaction.exchangeDetails = await repository.save(detail);
   }
 
   private async syncAffectedAccounts(

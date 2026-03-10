@@ -3,12 +3,14 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Currency } from '../../../common/domain/currency.enum';
 import { decimalTransformer } from '../../../common/domain/decimal.transformer';
 import { TransactionStatus, TransactionType, TransactionChannel } from './transaction.types';
+import { TransactionExchangeDetailEntity } from './transaction-exchange-detail.entity';
 
 registerEnumType(TransactionType, {
   name: 'TransactionType',
@@ -74,6 +76,14 @@ export class TransactionEntity {
     default: TransactionStatus.PENDING,
   })
   status!: TransactionStatus;
+
+  @Field(() => TransactionExchangeDetailEntity, { nullable: true })
+  @OneToOne(
+    () => TransactionExchangeDetailEntity,
+    (exchangeDetails) => exchangeDetails.transaction,
+    { nullable: true, eager: true },
+  )
+  exchangeDetails!: TransactionExchangeDetailEntity | null;
 
   @Field(() => Float)
   @Column({

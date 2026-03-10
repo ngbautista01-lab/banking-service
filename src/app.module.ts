@@ -10,6 +10,7 @@ import { SearchModule } from './infrastructure/search/search.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { AppController } from './app.controller';
 import { AccountsModule } from './modules/accounts/accounts.module';
+import { ExchangeModule } from './modules/exchange/exchange.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 
 @Module({
@@ -63,6 +64,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     SearchModule,
     ClientsModule,
     AccountsModule,
+    ExchangeModule,
     TransactionsModule,
   ],
 })
