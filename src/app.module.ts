@@ -11,6 +11,7 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { AppController } from './app.controller';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { ExchangeModule } from './modules/exchange/exchange.module';
+import { HealthModule } from './modules/health/health.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 
 @Module({
@@ -62,6 +63,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     CacheModule,
     DatabaseModule,
     SearchModule,
+    HealthModule,
     ClientsModule,
     AccountsModule,
     ExchangeModule,

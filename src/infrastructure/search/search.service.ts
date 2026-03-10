@@ -43,6 +43,19 @@ export class SearchService {
     }
   }
 
+  async healthCheck(): Promise<'up' | 'down' | 'disabled'> {
+    if (!this.client) {
+      return 'disabled';
+    }
+
+    try {
+      await this.client.info();
+      return 'up';
+    } catch {
+      return 'down';
+    }
+  }
+
   async indexClient(entry: IndexedClient): Promise<void> {
     if (!this.client) {
       return;
