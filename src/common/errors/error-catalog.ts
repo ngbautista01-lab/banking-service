@@ -93,11 +93,35 @@ export const TransactionErrors = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+export const ExchangeErrors = {
+  EXCHANGE_RATE_ALREADY_EXISTS: {
+    code: 'EXCHANGE_RATE_ALREADY_EXISTS',
+    message: 'Exchange rate already exists',
+    httpStatus: HttpStatus.CONFLICT,
+  },
+  EXCHANGE_RATE_NOT_FOUND: {
+    code: 'EXCHANGE_RATE_NOT_FOUND',
+    message: 'Exchange rate was not found',
+    httpStatus: HttpStatus.NOT_FOUND,
+  },
+  INVALID_EXCHANGE_RATE: {
+    code: 'INVALID_EXCHANGE_RATE',
+    message: 'Exchange rate is invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+  INVALID_EXCHANGE_CURRENCIES: {
+    code: 'INVALID_EXCHANGE_CURRENCIES',
+    message: 'Exchange currencies are invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 export const ErrorCatalog = {
   ...ClientErrors,
   ...CommonErrors,
   ...AccountErrors,
   ...TransactionErrors,
+  ...ExchangeErrors,
 } as const;
 
 export type ErrorCatalogKey = keyof typeof ErrorCatalog;

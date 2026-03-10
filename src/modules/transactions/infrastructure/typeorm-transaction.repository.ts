@@ -24,12 +24,16 @@ export class TypeOrmTransactionRepository implements TransactionRepository {
 
   findAll(): Promise<TransactionEntity[]> {
     return this.repository.find({
+      relations: { exchangeDetails: true },
       order: { createdAt: 'DESC' },
     });
   }
 
   findById(id: string): Promise<TransactionEntity | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository.findOne({
+      where: { id },
+      relations: { exchangeDetails: true },
+    });
   }
 
   findDuplicate({
@@ -49,6 +53,7 @@ export class TypeOrmTransactionRepository implements TransactionRepository {
   findByIds(ids: string[]): Promise<TransactionEntity[]> {
     return this.repository.find({
       where: { id: In(ids) },
+      relations: { exchangeDetails: true },
       order: { createdAt: 'DESC' },
     });
   }
@@ -59,6 +64,7 @@ export class TypeOrmTransactionRepository implements TransactionRepository {
         { reference: ILike(`%${term}%`) },
         { description: ILike(`%${term}%`) },
       ],
+      relations: { exchangeDetails: true },
       order: { createdAt: 'DESC' },
       take: 20,
     });
