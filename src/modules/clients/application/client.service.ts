@@ -168,11 +168,11 @@ export class ClientService {
   }
 
   private clientCacheKey(id: string): string {
-    return `client:${id}`;
+    return `client:v2:${id}`;
   }
 
   private collectionCacheKey(): string {
-    return 'clients:all';
+    return 'clients:v2:all';
   }
 
   private async getClientOrThrow(id: string): Promise<ClientEntity> {
