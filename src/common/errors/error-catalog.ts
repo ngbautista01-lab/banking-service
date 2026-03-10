@@ -53,12 +53,51 @@ export const AccountErrors = {
     message: 'Account number is invalid',
     httpStatus: HttpStatus.BAD_REQUEST,
   },
+  INSUFFICIENT_ACCOUNT_FUNDS: {
+    code: 'INSUFFICIENT_ACCOUNT_FUNDS',
+    message: 'Account balance is insufficient',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
+export const TransactionErrors = {
+  TRANSACTION_ALREADY_EXISTS: {
+    code: 'TRANSACTION_ALREADY_EXISTS',
+    message: 'Transaction already exists',
+    httpStatus: HttpStatus.CONFLICT,
+  },
+  TRANSACTION_NOT_FOUND: {
+    code: 'TRANSACTION_NOT_FOUND',
+    message: 'Transaction was not found',
+    httpStatus: HttpStatus.NOT_FOUND,
+  },
+  INVALID_TRANSACTION_REFERENCE: {
+    code: 'INVALID_TRANSACTION_REFERENCE',
+    message: 'Transaction reference is invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+  INVALID_TRANSACTION_AMOUNT: {
+    code: 'INVALID_TRANSACTION_AMOUNT',
+    message: 'Transaction amount is invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+  INVALID_TRANSACTION_ACCOUNTS: {
+    code: 'INVALID_TRANSACTION_ACCOUNTS',
+    message: 'Transaction accounts are invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+  INVALID_TRANSACTION_STATE: {
+    code: 'INVALID_TRANSACTION_STATE',
+    message: 'Transaction state transition is invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
 } as const satisfies Record<string, ErrorDefinition>;
 
 export const ErrorCatalog = {
   ...ClientErrors,
   ...CommonErrors,
   ...AccountErrors,
+  ...TransactionErrors,
 } as const;
 
 export type ErrorCatalogKey = keyof typeof ErrorCatalog;
