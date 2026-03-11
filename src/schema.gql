@@ -1,0 +1,247 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Account {
+  accountNumber: String!
+  alias: String!
+  balance: Float!
+  clientId: String!
+  createdAt: DateTime!
+  currency: Currency!
+  id: ID!
+  status: AccountStatus!
+  updatedAt: DateTime!
+}
+
+enum AccountStatus {
+  ACTIVE
+  BLOCKED
+  INACTIVE
+}
+
+type Client {
+  createdAt: DateTime!
+  documentNumber: String!
+  email: String!
+  firstName: String!
+  id: ID!
+  lastName: String!
+  phone: String!
+  status: ClientStatus!
+  updatedAt: DateTime!
+}
+
+enum ClientStatus {
+  ACTIVE
+  BLOCKED
+  INACTIVE
+}
+
+input ConvertCurrencyInput {
+  amount: Float!
+  baseCurrency: Currency!
+  effectiveAt: DateTime
+  quoteCurrency: Currency!
+}
+
+input CreateAccountInput {
+  accountNumber: String!
+  alias: String!
+  balance: Float! = 0
+  clientId: String!
+  currency: Currency!
+  status: AccountStatus! = ACTIVE
+}
+
+input CreateClientInput {
+  documentNumber: String!
+  email: String!
+  firstName: String!
+  lastName: String!
+  phone: String!
+  status: ClientStatus! = ACTIVE
+}
+
+input CreateExchangeRateInput {
+  baseCurrency: Currency!
+  effectiveAt: DateTime!
+  quoteCurrency: Currency!
+  rate: Float!
+}
+
+input CreateTransactionInput {
+  amount: Float!
+  channel: String!
+  currency: String!
+  description: String
+  destinationAccountId: String
+  reference: String!
+  sourceAccountId: String!
+  status: String! = "PENDING"
+  type: String!
+}
+
+enum Currency {
+  DOP
+  EUR
+  USD
+}
+
+type CurrencyConversion {
+  amount: Float!
+  baseCurrency: Currency!
+  convertedAmount: Float!
+  effectiveAt: DateTime!
+  quoteCurrency: Currency!
+  rate: Float!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type ExchangeRate {
+  baseCurrency: Currency!
+  createdAt: DateTime!
+  effectiveAt: DateTime!
+  id: ID!
+  quoteCurrency: Currency!
+  rate: Float!
+  updatedAt: DateTime!
+}
+
+type Mutation {
+  createAccount(input: CreateAccountInput!): Account!
+  createClient(input: CreateClientInput!): Client!
+  createExchangeRate(input: CreateExchangeRateInput!): ExchangeRate!
+  createTransaction(input: CreateTransactionInput!): Transaction!
+  deleteAccount(id: String!): Boolean!
+  deleteClient(id: String!): Boolean!
+  deleteExchangeRate(id: String!): Boolean!
+  deleteTransaction(id: String!): Boolean!
+  updateAccount(input: UpdateAccountInput!): Account!
+  updateClient(input: UpdateClientInput!): Client!
+  updateExchangeRate(input: UpdateExchangeRateInput!): ExchangeRate!
+  updateTransaction(input: UpdateTransactionInput!): Transaction!
+}
+
+type Query {
+  account(id: String!): Account!
+  accounts: [Account!]!
+  client(id: String!): Client!
+  clients: [Client!]!
+  convertCurrency(input: ConvertCurrencyInput!): CurrencyConversion!
+  exchangeRate(id: String!): ExchangeRate!
+  exchangeRates: [ExchangeRate!]!
+  searchAccounts(input: SearchAccountsInput!): [Account!]!
+  searchClients(input: SearchClientsInput!): [Client!]!
+  searchTransactions(input: SearchTransactionsInput!): [Transaction!]!
+  transaction(id: String!): Transaction!
+  transactions: [Transaction!]!
+}
+
+input SearchAccountsInput {
+  term: String!
+}
+
+input SearchClientsInput {
+  term: String!
+}
+
+input SearchTransactionsInput {
+  term: String!
+}
+
+type Transaction {
+  amount: Float!
+  channel: TransactionChannel!
+  createdAt: DateTime!
+  currency: Currency!
+  description: String
+  destinationAccountId: String
+  destinationCurrentBalance: Float
+  destinationPreviousBalance: Float
+  exchangeDetails: TransactionExchangeDetail
+  id: ID!
+  reference: String!
+  sourceAccountId: String!
+  sourceCurrentBalance: Float!
+  sourcePreviousBalance: Float!
+  status: TransactionStatus!
+  type: TransactionType!
+  updatedAt: DateTime!
+}
+
+enum TransactionChannel {
+  API
+  ATM
+  BRANCH
+  MOBILE
+  WEB
+}
+
+type TransactionExchangeDetail {
+  baseCurrency: Currency!
+  convertedAmount: Float!
+  effectiveAt: DateTime!
+  quoteCurrency: Currency!
+  rate: Float!
+  sourceAmount: Float!
+  transactionId: String!
+}
+
+enum TransactionStatus {
+  COMPLETED
+  FAILED
+  PENDING
+  REVERSED
+}
+
+enum TransactionType {
+  DEPOSIT
+  TRANSFER
+  WITHDRAWAL
+}
+
+input UpdateAccountInput {
+  accountNumber: String
+  alias: String
+  balance: Float = 0
+  clientId: String
+  currency: Currency
+  id: String!
+  status: AccountStatus = ACTIVE
+}
+
+input UpdateClientInput {
+  documentNumber: String
+  email: String
+  firstName: String
+  id: String!
+  lastName: String
+  phone: String
+  status: ClientStatus = ACTIVE
+}
+
+input UpdateExchangeRateInput {
+  baseCurrency: Currency
+  effectiveAt: DateTime
+  id: String!
+  quoteCurrency: Currency
+  rate: Float
+}
+
+input UpdateTransactionInput {
+  amount: Float
+  channel: String
+  currency: String
+  description: String
+  destinationAccountId: String
+  id: String!
+  reference: String
+  sourceAccountId: String
+  status: String = "PENDING"
+  type: String
+}
