@@ -2,7 +2,9 @@ import { AppException } from '../../../common/errors/app.exception';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
 import { SearchService } from '../../../infrastructure/search/search.service';
 import { Currency } from '../../../common/domain/currency.enum';
+import { AccountEntity } from '../domain/account.entity';
 import { AccountStatus } from '../domain/account.types';
+import { AccountRepository } from './ports/account.repository';
 import { AccountService } from './account.service';
 
 jest.mock('uuid', () => ({
@@ -15,7 +17,9 @@ jest.mock('uuid', () => ({
 }));
 
 describe('AccountService', () => {
-  const createRepositoryMock = () => ({
+  type AccountRepositoryMock = jest.Mocked<AccountRepository>;
+
+  const createRepositoryMock = (): AccountRepositoryMock => ({
     create: jest.fn(),
     save: jest.fn(),
     findAll: jest.fn(),
@@ -32,10 +36,16 @@ describe('AccountService', () => {
     del: jest.fn(),
   });
 
-  const createSearchServiceMock = () => ({
-    indexAccount: jest.fn(),
-    searchAccounts: jest.fn(),
-    removeAccount: jest.fn(),
+  type SearchServiceMock = {
+    indexAccount: jest.Mock<void, [AccountEntity]>;
+    searchAccounts: jest.Mock<Promise<string[]>, [string]>;
+    removeAccount: jest.Mock<void, [string]>;
+  };
+
+  const createSearchServiceMock = (): SearchServiceMock => ({
+    indexAccount: jest.fn<void, [AccountEntity]>(),
+    searchAccounts: jest.fn<Promise<string[]>, [string]>(),
+    removeAccount: jest.fn<void, [string]>(),
   });
 
   it('creates an account, normalizes account number and indexes it', async () => {
@@ -43,18 +53,23 @@ describe('AccountService', () => {
     const cacheService = createCacheServiceMock();
     const searchService = createSearchServiceMock();
     const service = new AccountService(
-      repository as any,
+      repository,
       cacheService as unknown as CacheService,
       searchService as unknown as SearchService,
     );
 
     repository.findDuplicate.mockResolvedValue(null);
-    repository.create.mockImplementation((value) => value);
-    repository.save.mockImplementation(async (value) => ({
-      ...value,
-      createdAt: new Date('2026-03-10T10:00:00.000Z'),
-      updatedAt: new Date('2026-03-10T10:00:00.000Z'),
-    }));
+    repository.create.mockImplementation(
+      (value): AccountEntity => value as AccountEntity,
+    );
+    repository.save.mockImplementation(
+      (value): Promise<AccountEntity> =>
+        Promise.resolve({
+          ...value,
+          createdAt: new Date('2026-03-10T10:00:00.000Z'),
+          updatedAt: new Date('2026-03-10T10:00:00.000Z'),
+        }),
+    );
     cacheService.set.mockResolvedValue(undefined);
     cacheService.del.mockResolvedValue(undefined);
     searchService.indexAccount.mockResolvedValue(undefined);
@@ -68,7 +83,7 @@ describe('AccountService', () => {
       status: AccountStatus.ACTIVE,
     });
 
-    expect(repository.create).toHaveBeenCalledWith(
+    expect(repository.create.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         accountNumber: '000123456789',
         alias: 'Cuenta principal',
@@ -76,12 +91,12 @@ describe('AccountService', () => {
         balance: 1500,
       }),
     );
-    expect(searchService.indexAccount).toHaveBeenCalledWith(result);
-    expect(cacheService.set).toHaveBeenCalledWith(
+    expect(searchService.indexAccount.mock.calls[0]?.[0]).toEqual(result);
+    expect(cacheService.set.mock.calls[0]).toEqual([
       `account:v2:${result.id}`,
       result,
       120,
-    );
+    ]);
   });
 
   it('returns an account by id from the repository and refreshes cache', async () => {
@@ -89,7 +104,7 @@ describe('AccountService', () => {
     const cacheService = createCacheServiceMock();
     const searchService = createSearchServiceMock();
     const service = new AccountService(
-      repository as any,
+      repository,
       cacheService as unknown as CacheService,
       searchService as unknown as SearchService,
     );
@@ -102,6 +117,8 @@ describe('AccountService', () => {
       currency: Currency.DOP,
       balance: 1500,
       status: AccountStatus.ACTIVE,
+      createdAt: new Date('2026-03-10T10:00:00.000Z'),
+      updatedAt: new Date('2026-03-10T10:00:00.000Z'),
     };
 
     repository.findById.mockResolvedValue(account);
@@ -121,7 +138,7 @@ describe('AccountService', () => {
     const cacheService = createCacheServiceMock();
     const searchService = createSearchServiceMock();
     const service = new AccountService(
-      repository as any,
+      repository,
       cacheService as unknown as CacheService,
       searchService as unknown as SearchService,
     );
@@ -135,6 +152,8 @@ describe('AccountService', () => {
         currency: Currency.DOP,
         balance: 1500,
         status: AccountStatus.ACTIVE,
+        createdAt: new Date('2026-03-10T10:00:00.000Z'),
+        updatedAt: new Date('2026-03-10T10:00:00.000Z'),
       },
     ];
 
@@ -144,12 +163,12 @@ describe('AccountService', () => {
     await expect(service.search({ term: 'principal' })).resolves.toEqual(
       accounts,
     );
-    expect(repository.findByIds).toHaveBeenCalledWith([accounts[0].id]);
+    expect(repository.findByIds.mock.calls[0]).toEqual([[accounts[0].id]]);
   });
 
   it('throws for an invalid account id', async () => {
     const service = new AccountService(
-      createRepositoryMock() as any,
+      createRepositoryMock(),
       createCacheServiceMock() as unknown as CacheService,
       createSearchServiceMock() as unknown as SearchService,
     );

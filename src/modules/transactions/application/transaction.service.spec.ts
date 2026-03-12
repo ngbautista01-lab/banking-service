@@ -2,12 +2,18 @@ import { AppException } from '../../../common/errors/app.exception';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
 import { SearchService } from '../../../infrastructure/search/search.service';
 import { Currency } from '../../../common/domain/currency.enum';
+import { DataSource } from 'typeorm';
+import { AccountBalanceContextPort } from '../../accounts/application/ports/account-balance-context.port';
+import { ExchangeContextPort } from '../../exchange/application/ports/exchange-context.port';
 import { TransactionService } from './transaction.service';
+import { TransactionExecutionOrchestrator } from './transaction-execution.orchestrator';
 import {
   TransactionChannel,
   TransactionStatus,
   TransactionType,
 } from '../domain/transaction.types';
+import { TransactionRepository } from './ports/transaction.repository';
+import { TransactionEntity } from '../domain/transaction.entity';
 
 jest.mock('uuid', () => ({
   v4: jest.fn(() => '11111111-1111-4111-8111-111111111111'),
@@ -19,12 +25,13 @@ jest.mock('uuid', () => ({
 }));
 
 describe('TransactionService', () => {
-  const createTransactionRepositoryMock = () => ({
+  type TransactionRepositoryMock = jest.Mocked<TransactionRepository>;
+
+  const createTransactionRepositoryMock = (): TransactionRepositoryMock => ({
     create: jest.fn(),
     save: jest.fn(),
     findAll: jest.fn(),
     findById: jest.fn(),
-    findByReference: jest.fn(),
     findDuplicate: jest.fn(),
     findByIds: jest.fn(),
     searchByTerm: jest.fn(),
@@ -49,15 +56,18 @@ describe('TransactionService', () => {
     const cacheService = createCacheServiceMock();
     const searchService = createSearchServiceMock();
     const service = new TransactionService(
-      {} as any,
-      transactionRepository as any,
-      { create: jest.fn() } as any,
-      { createContext: jest.fn() } as any,
+      {} as DataSource,
+      transactionRepository,
+      {
+        create: jest.fn(),
+        snapshot: jest.fn(),
+      } as unknown as AccountBalanceContextPort,
+      { createContext: jest.fn() } as unknown as ExchangeContextPort,
       {
         execute: jest.fn(),
         reverse: jest.fn(),
         captureSnapshots: jest.fn(),
-      } as any,
+      } as unknown as TransactionExecutionOrchestrator,
       cacheService as unknown as CacheService,
       searchService as unknown as SearchService,
     );
@@ -70,7 +80,7 @@ describe('TransactionService', () => {
     };
   };
 
-  const transaction = {
+  const transaction: TransactionEntity = {
     id: '4268d7e6-d342-4f91-9019-eda9b7a0514b',
     sourceAccountId: '55cbd2f0-19b0-4a96-bd36-d59c5c738179',
     destinationAccountId: null,
@@ -95,7 +105,7 @@ describe('TransactionService', () => {
     cacheService.get.mockResolvedValue([transaction]);
 
     await expect(service.findAll()).resolves.toEqual([transaction]);
-    expect(transactionRepository.findAll).not.toHaveBeenCalled();
+    expect(transactionRepository.findAll.mock.calls).toHaveLength(0);
   });
 
   it('loads all transactions from repository and caches them on cache miss', async () => {
@@ -105,11 +115,11 @@ describe('TransactionService', () => {
     transactionRepository.findAll.mockResolvedValue([transaction]);
 
     await expect(service.findAll()).resolves.toEqual([transaction]);
-    expect(cacheService.set).toHaveBeenCalledWith(
+    expect(cacheService.set.mock.calls[0]).toEqual([
       'transactions:v2:all',
       [transaction],
       60,
-    );
+    ]);
   });
 
   it('returns a transaction by id and refreshes cache', async () => {
@@ -118,41 +128,17 @@ describe('TransactionService', () => {
     cacheService.del.mockResolvedValue(undefined);
     transactionRepository.findById.mockResolvedValue(transaction);
 
-    await expect(service.findById(transaction.id)).resolves.toEqual(transaction);
-    expect(transactionRepository.findById).toHaveBeenCalledWith(transaction.id);
-    expect(cacheService.set).toHaveBeenCalledWith(
+    await expect(service.findById(transaction.id)).resolves.toEqual(
+      transaction,
+    );
+    expect(transactionRepository.findById.mock.calls[0]).toEqual([
+      transaction.id,
+    ]);
+    expect(cacheService.set.mock.calls[0]).toEqual([
       `transaction:v2:${transaction.id}`,
       transaction,
       120,
-    );
-  });
-
-  it('returns a transaction by reference when the identifier is not a uuid', async () => {
-    const { service, cacheService, transactionRepository } = createService();
-    cacheService.set.mockResolvedValue(undefined);
-    cacheService.del.mockResolvedValue(undefined);
-    transactionRepository.findByReference.mockResolvedValue(transaction);
-
-    await expect(service.findById(' dep-001 ')).resolves.toEqual(transaction);
-    expect(transactionRepository.findByReference).toHaveBeenCalledWith('DEP-001');
-  });
-
-  it('falls back to reference lookup when a uuid-shaped identifier is not found by id', async () => {
-    const { service, cacheService, transactionRepository } = createService();
-    cacheService.set.mockResolvedValue(undefined);
-    cacheService.del.mockResolvedValue(undefined);
-    transactionRepository.findById.mockResolvedValue(null);
-    transactionRepository.findByReference.mockResolvedValue(transaction);
-
-    await expect(
-      service.findById('4268d7e6-d342-4f91-9019-eda9b7a0514b'),
-    ).resolves.toEqual(transaction);
-    expect(transactionRepository.findById).toHaveBeenCalledWith(
-      '4268d7e6-d342-4f91-9019-eda9b7a0514b',
-    );
-    expect(transactionRepository.findByReference).toHaveBeenCalledWith(
-      '4268D7E6-D342-4F91-9019-EDA9B7A0514B',
-    );
+    ]);
   });
 
   it('uses indexed ids during transaction search when available', async () => {
@@ -163,7 +149,7 @@ describe('TransactionService', () => {
     await expect(service.search({ term: 'DEP-001' })).resolves.toEqual([
       transaction,
     ]);
-    expect(transactionRepository.findByIds).toHaveBeenCalledWith([
+    expect(transactionRepository.findByIds.mock.calls[0]).toEqual([
       transaction.id,
     ]);
   });
@@ -173,6 +159,6 @@ describe('TransactionService', () => {
     transactionRepository.findById.mockResolvedValue(transaction);
 
     await expect(service.remove(transaction.id)).rejects.toThrow(AppException);
-    expect(transactionRepository.remove).not.toHaveBeenCalled();
+    expect(transactionRepository.remove.mock.calls).toHaveLength(0);
   });
 });

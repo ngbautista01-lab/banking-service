@@ -1,7 +1,8 @@
-import { Currency } from '../../../common/domain/currency.enum';
 import { AppException } from '../../../common/errors/app.exception';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
 import { SearchService } from '../../../infrastructure/search/search.service';
+import { Repository } from 'typeorm';
+import { ClientEntity } from '../domain/client.entity';
 import { ClientStatus } from '../domain/client.types';
 import { ClientService } from './client.service';
 
@@ -15,7 +16,14 @@ jest.mock('uuid', () => ({
 }));
 
 describe('ClientService', () => {
-  const createRepositoryMock = () => ({
+  type ClientRepositoryMock = jest.Mocked<
+    Pick<
+      Repository<ClientEntity>,
+      'findOne' | 'create' | 'save' | 'find' | 'remove'
+    >
+  >;
+
+  const createRepositoryMock = (): ClientRepositoryMock => ({
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
@@ -29,10 +37,16 @@ describe('ClientService', () => {
     del: jest.fn(),
   });
 
-  const createSearchServiceMock = () => ({
-    indexClient: jest.fn(),
-    searchClients: jest.fn(),
-    removeClient: jest.fn(),
+  type SearchServiceMock = {
+    indexClient: jest.Mock<void, [ClientEntity]>;
+    searchClients: jest.Mock<Promise<string[]>, [string]>;
+    removeClient: jest.Mock<void, [string]>;
+  };
+
+  const createSearchServiceMock = (): SearchServiceMock => ({
+    indexClient: jest.fn<void, [ClientEntity]>(),
+    searchClients: jest.fn<Promise<string[]>, [string]>(),
+    removeClient: jest.fn<void, [string]>(),
   });
 
   it('creates a client, normalizes values and indexes it', async () => {
@@ -40,18 +54,26 @@ describe('ClientService', () => {
     const cacheService = createCacheServiceMock();
     const searchService = createSearchServiceMock();
     const service = new ClientService(
-      repository as any,
+      repository as unknown as Repository<ClientEntity>,
       cacheService as unknown as CacheService,
       searchService as unknown as SearchService,
     );
 
     repository.findOne.mockResolvedValue(null);
-    repository.create.mockImplementation((value) => value);
-    repository.save.mockImplementation(async (value) => ({
-      ...value,
-      createdAt: new Date('2026-03-10T10:00:00.000Z'),
-      updatedAt: new Date('2026-03-10T10:00:00.000Z'),
-    }));
+    repository.create.mockImplementation(
+      (value): ClientEntity => value as ClientEntity,
+    );
+    repository.save.mockImplementation(
+      (value): Promise<ClientEntity> =>
+        Promise.resolve({
+          ...(value as ClientEntity),
+          id:
+            (value as ClientEntity).id ??
+            '11111111-1111-4111-8111-111111111111',
+          createdAt: new Date('2026-03-10T10:00:00.000Z'),
+          updatedAt: new Date('2026-03-10T10:00:00.000Z'),
+        }),
+    );
     cacheService.set.mockResolvedValue(undefined);
     cacheService.del.mockResolvedValue(undefined);
     searchService.indexClient.mockResolvedValue(undefined);
@@ -65,7 +87,7 @@ describe('ClientService', () => {
       status: ClientStatus.ACTIVE,
     });
 
-    expect(repository.create).toHaveBeenCalledWith(
+    expect(repository.create.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         firstName: 'Ana',
         lastName: 'Perez',
@@ -74,12 +96,12 @@ describe('ClientService', () => {
         phone: '(809) 555-0101',
       }),
     );
-    expect(searchService.indexClient).toHaveBeenCalledWith(result);
-    expect(cacheService.set).toHaveBeenCalledWith(
+    expect(searchService.indexClient.mock.calls[0]?.[0]).toEqual(result);
+    expect(cacheService.set.mock.calls[0]).toEqual([
       `client:v2:${result.id}`,
       result,
       120,
-    );
+    ]);
   });
 
   it('returns the client by id from the repository and refreshes cache', async () => {
@@ -87,7 +109,7 @@ describe('ClientService', () => {
     const cacheService = createCacheServiceMock();
     const searchService = createSearchServiceMock();
     const service = new ClientService(
-      repository as any,
+      repository as unknown as Repository<ClientEntity>,
       cacheService as unknown as CacheService,
       searchService as unknown as SearchService,
     );
@@ -100,6 +122,8 @@ describe('ClientService', () => {
       documentNumber: '00112345678',
       phone: '8095550101',
       status: ClientStatus.ACTIVE,
+      createdAt: new Date('2026-03-10T10:00:00.000Z'),
+      updatedAt: new Date('2026-03-10T10:00:00.000Z'),
     };
 
     repository.findOne.mockResolvedValue(client);
@@ -107,7 +131,9 @@ describe('ClientService', () => {
     cacheService.del.mockResolvedValue(undefined);
 
     await expect(service.findById(client.id)).resolves.toEqual(client);
-    expect(repository.findOne).toHaveBeenCalledWith({ where: { id: client.id } });
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { id: client.id },
+    });
     expect(cacheService.set).toHaveBeenCalledWith(
       `client:v2:${client.id}`,
       client,
@@ -120,7 +146,7 @@ describe('ClientService', () => {
     const cacheService = createCacheServiceMock();
     const searchService = createSearchServiceMock();
     const service = new ClientService(
-      repository as any,
+      repository as unknown as Repository<ClientEntity>,
       cacheService as unknown as CacheService,
       searchService as unknown as SearchService,
     );
@@ -134,6 +160,8 @@ describe('ClientService', () => {
         documentNumber: '00112345678',
         phone: '8095550101',
         status: ClientStatus.ACTIVE,
+        createdAt: new Date('2026-03-10T10:00:00.000Z'),
+        updatedAt: new Date('2026-03-10T10:00:00.000Z'),
       },
     ];
 
@@ -150,7 +178,7 @@ describe('ClientService', () => {
 
   it('throws for an invalid client id', async () => {
     const service = new ClientService(
-      createRepositoryMock() as any,
+      createRepositoryMock() as unknown as Repository<ClientEntity>,
       createCacheServiceMock() as unknown as CacheService,
       createSearchServiceMock() as unknown as SearchService,
     );
