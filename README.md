@@ -42,13 +42,22 @@ El proyecto se organizo por modulos de negocio con separacion por capas dentro d
 
 ## Diagramas
 
+### Arquitectura del sistema
+
+![System Architecture](docs/general-system-arquitecture.svg)
+
+### Arquitectura por capas
+
 ![Layered Architecture](docs/layered-architecture.svg)
 
-![System Architecture](docs/system-architecture.svg)
+### Contextos de dominio
 
 ![Domain Contexts](docs/domain-contexts.svg)
 
+### Flujo de transacciones
+
 ![Transaction Execution](docs/transaction-execution.svg)
+
 
 ## Reglas de negocio principales
 
