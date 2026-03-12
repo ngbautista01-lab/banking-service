@@ -24,6 +24,7 @@ describe('TransactionService', () => {
     save: jest.fn(),
     findAll: jest.fn(),
     findById: jest.fn(),
+    findByReference: jest.fn(),
     findDuplicate: jest.fn(),
     findByIds: jest.fn(),
     searchByTerm: jest.fn(),
@@ -123,6 +124,34 @@ describe('TransactionService', () => {
       `transaction:v2:${transaction.id}`,
       transaction,
       120,
+    );
+  });
+
+  it('returns a transaction by reference when the identifier is not a uuid', async () => {
+    const { service, cacheService, transactionRepository } = createService();
+    cacheService.set.mockResolvedValue(undefined);
+    cacheService.del.mockResolvedValue(undefined);
+    transactionRepository.findByReference.mockResolvedValue(transaction);
+
+    await expect(service.findById(' dep-001 ')).resolves.toEqual(transaction);
+    expect(transactionRepository.findByReference).toHaveBeenCalledWith('DEP-001');
+  });
+
+  it('falls back to reference lookup when a uuid-shaped identifier is not found by id', async () => {
+    const { service, cacheService, transactionRepository } = createService();
+    cacheService.set.mockResolvedValue(undefined);
+    cacheService.del.mockResolvedValue(undefined);
+    transactionRepository.findById.mockResolvedValue(null);
+    transactionRepository.findByReference.mockResolvedValue(transaction);
+
+    await expect(
+      service.findById('4268d7e6-d342-4f91-9019-eda9b7a0514b'),
+    ).resolves.toEqual(transaction);
+    expect(transactionRepository.findById).toHaveBeenCalledWith(
+      '4268d7e6-d342-4f91-9019-eda9b7a0514b',
+    );
+    expect(transactionRepository.findByReference).toHaveBeenCalledWith(
+      '4268D7E6-D342-4F91-9019-EDA9B7A0514B',
     );
   });
 

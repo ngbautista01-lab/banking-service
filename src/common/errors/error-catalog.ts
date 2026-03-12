@@ -35,6 +35,26 @@ export const CommonErrors = {
     message: 'Internal server error',
     httpStatus: HttpStatus.INTERNAL_SERVER_ERROR,
   },
+  DATABASE_UNIQUE_CONSTRAINT: {
+    code: 'DATABASE_UNIQUE_CONSTRAINT',
+    message: 'Database unique constraint violated',
+    httpStatus: HttpStatus.CONFLICT,
+  },
+  DATABASE_FOREIGN_KEY_CONSTRAINT: {
+    code: 'DATABASE_FOREIGN_KEY_CONSTRAINT',
+    message: 'Database foreign key constraint violated',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+  DATABASE_INVALID_QUERY: {
+    code: 'DATABASE_INVALID_QUERY',
+    message: 'Database query is invalid',
+    httpStatus: HttpStatus.BAD_REQUEST,
+  },
+  DATABASE_UNAVAILABLE: {
+    code: 'DATABASE_UNAVAILABLE',
+    message: 'Database is unavailable',
+    httpStatus: HttpStatus.SERVICE_UNAVAILABLE,
+  },
 } as const satisfies Record<string, ErrorDefinition>;
 
 export const AccountErrors = {

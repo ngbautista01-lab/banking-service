@@ -10,6 +10,7 @@ export class AppException extends HttpException {
     super(
       {
         code: error.code,
+        message: error.message,
       },
       error.httpStatus,
     );

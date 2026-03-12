@@ -36,6 +36,13 @@ export class TypeOrmTransactionRepository implements TransactionRepository {
     });
   }
 
+  findByReference(reference: string): Promise<TransactionEntity | null> {
+    return this.repository.findOne({
+      where: { reference },
+      relations: { exchangeDetails: true },
+    });
+  }
+
   findDuplicate({
     reference,
     excludeId,
@@ -73,5 +80,4 @@ export class TypeOrmTransactionRepository implements TransactionRepository {
   async remove(transaction: TransactionEntity): Promise<void> {
     await this.repository.remove(transaction);
   }
-
 }
