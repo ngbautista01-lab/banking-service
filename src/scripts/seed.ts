@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import AppDataSource from '../infrastructure/database/typeorm.config';
 import { Currency } from '../common/domain/currency.enum';
 import { AccountEntity } from '../modules/accounts/domain/account.entity';
@@ -279,7 +279,7 @@ async function seed(): Promise<void> {
         });
 
         const client = clientRepository.create({
-          id: existingClient?.id ?? uuidv4(),
+          id: existingClient?.id ?? randomUUID(),
           ...seedClient,
           documentNumber,
           phone: ClientRules.normalizePhone(seedClient.phone),
@@ -302,7 +302,7 @@ async function seed(): Promise<void> {
         });
 
         const account = accountRepository.create({
-          id: existingAccount?.id ?? uuidv4(),
+          id: existingAccount?.id ?? randomUUID(),
           clientId: client.id,
           accountNumber: seedAccount.accountNumber,
           alias: seedAccount.alias,
@@ -325,7 +325,7 @@ async function seed(): Promise<void> {
         });
 
         const rate = exchangeRateRepository.create({
-          id: existingRate?.id ?? uuidv4(),
+          id: existingRate?.id ?? randomUUID(),
           ...seedRate,
         });
 
@@ -355,7 +355,7 @@ async function seed(): Promise<void> {
         });
 
         const transaction = transactionRepository.create({
-          id: existingTransaction?.id ?? uuidv4(),
+          id: existingTransaction?.id ?? randomUUID(),
           sourceAccountId: sourceAccount.id,
           destinationAccountId: destinationAccount?.id ?? null,
           type: seedTransaction.type,

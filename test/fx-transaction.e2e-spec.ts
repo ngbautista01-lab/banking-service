@@ -33,6 +33,8 @@ describe('FX Transaction Flow (e2e)', () => {
   const createdClientIds: string[] = [];
 
   const suffix = `${Date.now()}`;
+  const naturalIdSuffix = suffix.slice(-8);
+  const legalIdSuffix = suffix.slice(-6);
 
   jest.setTimeout(30000);
 
@@ -129,7 +131,7 @@ describe('FX Transaction Flow (e2e)', () => {
           firstName: 'Fx',
           lastName: 'Source',
           email: `fx-source-${suffix}@example.com`,
-          documentNumber: '00112345678',
+          documentNumber: `001${naturalIdSuffix}`,
           phone: '809-555-0101',
           status: 'ACTIVE',
         },
@@ -152,7 +154,7 @@ describe('FX Transaction Flow (e2e)', () => {
           firstName: 'Fx',
           lastName: 'Destination',
           email: `fx-destination-${suffix}@example.com`,
-          documentNumber: '101234567',
+          documentNumber: `101${legalIdSuffix}`,
           phone: '809-555-0102',
           status: 'ACTIVE',
         },

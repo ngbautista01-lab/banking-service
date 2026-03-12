@@ -150,7 +150,7 @@ describe('TransactionService', () => {
       transaction,
     ]);
     expect(transactionRepository.findByIds.mock.calls[0]).toEqual([
-      transaction.id,
+      [transaction.id],
     ]);
   });
 

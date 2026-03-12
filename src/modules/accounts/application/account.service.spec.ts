@@ -37,15 +37,15 @@ describe('AccountService', () => {
   });
 
   type SearchServiceMock = {
-    indexAccount: jest.Mock<void, [AccountEntity]>;
+    indexAccount: jest.Mock<Promise<void>, [AccountEntity]>;
     searchAccounts: jest.Mock<Promise<string[]>, [string]>;
-    removeAccount: jest.Mock<void, [string]>;
+    removeAccount: jest.Mock<Promise<void>, [string]>;
   };
 
   const createSearchServiceMock = (): SearchServiceMock => ({
-    indexAccount: jest.fn<void, [AccountEntity]>(),
+    indexAccount: jest.fn<Promise<void>, [AccountEntity]>(),
     searchAccounts: jest.fn<Promise<string[]>, [string]>(),
-    removeAccount: jest.fn<void, [string]>(),
+    removeAccount: jest.fn<Promise<void>, [string]>(),
   });
 
   it('creates an account, normalizes account number and indexes it', async () => {
