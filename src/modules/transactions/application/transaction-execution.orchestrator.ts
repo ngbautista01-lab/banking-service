@@ -59,7 +59,7 @@ export class TransactionExecutionOrchestrator {
     };
   }
 
-  async reverse(params: {
+  reverse(params: {
     transaction: ReversibleTransactionContext;
     sourceAccountContext: AccountBalanceContext;
     destinationAccountContext: AccountBalanceContext | null;
@@ -73,13 +73,13 @@ export class TransactionExecutionOrchestrator {
       params.destinationAccountContext,
     );
 
-    return {
+    return Promise.resolve({
       balanceSnapshots: this.captureSnapshots(
         params.sourceAccountContext,
         params.destinationAccountContext,
       ),
       exchangeDetails: null,
-    };
+    });
   }
 
   captureSnapshots(
@@ -133,9 +133,7 @@ export class TransactionExecutionOrchestrator {
     };
   }
 
-  private resolveReversalEffects(
-    transaction: ReversibleTransactionContext,
-  ): {
+  private resolveReversalEffects(transaction: ReversibleTransactionContext): {
     balanceEffects: TransactionBalanceEffect[];
   } {
     const effects = TransactionRules.reverseExecutedMovement(transaction);

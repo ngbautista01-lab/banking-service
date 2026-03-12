@@ -1,5 +1,7 @@
 import { Currency } from '../../../common/domain/currency.enum';
 import { AppException } from '../../../common/errors/app.exception';
+import { ExchangeRateEntity } from '../domain/exchange-rate.entity';
+import { ExchangeRateRepository } from './ports/exchange-rate.repository';
 import { ExchangeService } from './exchange.service';
 
 jest.mock('uuid', () => ({
@@ -12,7 +14,9 @@ jest.mock('uuid', () => ({
 }));
 
 describe('ExchangeService', () => {
-  const createRepositoryMock = () => ({
+  type ExchangeRateRepositoryMock = jest.Mocked<ExchangeRateRepository>;
+
+  const createRepositoryMock = (): ExchangeRateRepositoryMock => ({
     create: jest.fn(),
     save: jest.fn(),
     findAll: jest.fn(),
@@ -24,13 +28,17 @@ describe('ExchangeService', () => {
 
   it('creates an exchange rate when the pair is unique', async () => {
     const repository = createRepositoryMock();
-    const service = new ExchangeService(repository as any);
+    const service = new ExchangeService(repository);
 
     const effectiveAt = new Date('2026-03-10T10:00:00.000Z');
 
     repository.findDuplicate.mockResolvedValue(null);
-    repository.create.mockImplementation((value) => value);
-    repository.save.mockImplementation(async (value) => value);
+    repository.create.mockImplementation(
+      (value): ExchangeRateEntity => value as ExchangeRateEntity,
+    );
+    repository.save.mockImplementation(
+      (value): Promise<ExchangeRateEntity> => Promise.resolve(value),
+    );
 
     const result = await service.create({
       baseCurrency: Currency.DOP,
@@ -39,7 +47,7 @@ describe('ExchangeService', () => {
       effectiveAt,
     });
 
-    expect(repository.create).toHaveBeenCalledWith(
+    expect(repository.create.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         baseCurrency: Currency.DOP,
         quoteCurrency: Currency.USD,
@@ -58,7 +66,7 @@ describe('ExchangeService', () => {
 
   it('converts with rate 1 when base and quote currencies are the same', async () => {
     const repository = createRepositoryMock();
-    const service = new ExchangeService(repository as any);
+    const service = new ExchangeService(repository);
 
     const result = await service.convert({
       amount: 500,
@@ -75,12 +83,12 @@ describe('ExchangeService', () => {
         quoteCurrency: Currency.DOP,
       }),
     );
-    expect(repository.findLatest).not.toHaveBeenCalled();
+    expect(repository.findLatest.mock.calls).toHaveLength(0);
   });
 
   it('converts using the latest stored exchange rate', async () => {
     const repository = createRepositoryMock();
-    const service = new ExchangeService(repository as any);
+    const service = new ExchangeService(repository);
     const effectiveAt = new Date('2026-03-10T10:00:00.000Z');
 
     repository.findLatest.mockResolvedValue({
@@ -89,6 +97,8 @@ describe('ExchangeService', () => {
       quoteCurrency: Currency.USD,
       rate: 0.0169,
       effectiveAt,
+      createdAt: new Date('2026-03-10T10:00:00.000Z'),
+      updatedAt: new Date('2026-03-10T10:00:00.000Z'),
     });
 
     await expect(
@@ -109,7 +119,7 @@ describe('ExchangeService', () => {
 
   it('throws when no exchange rate exists for the conversion pair', async () => {
     const repository = createRepositoryMock();
-    const service = new ExchangeService(repository as any);
+    const service = new ExchangeService(repository);
 
     repository.findLatest.mockResolvedValue(null);
 
