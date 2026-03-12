@@ -38,15 +38,15 @@ describe('ClientService', () => {
   });
 
   type SearchServiceMock = {
-    indexClient: jest.Mock<void, [ClientEntity]>;
+    indexClient: jest.Mock<Promise<void>, [ClientEntity]>;
     searchClients: jest.Mock<Promise<string[]>, [string]>;
-    removeClient: jest.Mock<void, [string]>;
+    removeClient: jest.Mock<Promise<void>, [string]>;
   };
 
   const createSearchServiceMock = (): SearchServiceMock => ({
-    indexClient: jest.fn<void, [ClientEntity]>(),
+    indexClient: jest.fn<Promise<void>, [ClientEntity]>(),
     searchClients: jest.fn<Promise<string[]>, [string]>(),
-    removeClient: jest.fn<void, [string]>(),
+    removeClient: jest.fn<Promise<void>, [string]>(),
   });
 
   it('creates a client, normalizes values and indexes it', async () => {
