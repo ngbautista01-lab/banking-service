@@ -7,6 +7,43 @@
   },
   "item": [
     {
+      "name": "health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test('health payload is valid', function () {",
+                  "  pm.expect(response.service).to.eql('banking-service');",
+                  "  pm.expect(response.status).to.be.oneOf(['ok', 'degraded']);",
+                  "  pm.expect(response.dependencies).to.be.an('object');",
+                  "  pm.expect(response.dependencies.database).to.be.oneOf(['up', 'down']);",
+                  "  pm.expect(response.dependencies.cache).to.be.oneOf(['redis', 'memory']);",
+                  "  pm.expect(response.dependencies.search).to.be.oneOf(['up', 'down', 'disabled']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
       "name": "clientes",
       "item": [
         {
@@ -723,6 +760,246 @@
       ]
     },
     {
+      "name": "exchange",
+      "item": [
+        {
+          "name": "Create DOP to USD Rate",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const effectiveAt = new Date(Date.now() - 60000).toISOString();",
+                  "pm.collectionVariables.set('dopToUsdEffectiveAt', effectiveAt);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('dopToUsdEffectiveAt', effectiveAt);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.createExchangeRate).to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('dopToUsdRateId', response.data.createExchangeRate.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('dopToUsdRateId', response.data.createExchangeRate.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateExchangeRate($input: CreateExchangeRateInput!) { createExchangeRate(input: $input) { id baseCurrency quoteCurrency rate effectiveAt createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"baseCurrency\": \"DOP\",\n      \"quoteCurrency\": \"USD\",\n      \"rate\": 0.0169,\n      \"effectiveAt\": \"{{dopToUsdEffectiveAt}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Create USD to DOP Rate",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const effectiveAt = new Date(Date.now() - 30000).toISOString();",
+                  "pm.collectionVariables.set('usdToDopEffectiveAt', effectiveAt);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('usdToDopEffectiveAt', effectiveAt);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.createExchangeRate).to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('usdToDopRateId', response.data.createExchangeRate.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('usdToDopRateId', response.data.createExchangeRate.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateExchangeRate($input: CreateExchangeRateInput!) { createExchangeRate(input: $input) { id baseCurrency quoteCurrency rate effectiveAt createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"baseCurrency\": \"USD\",\n      \"quoteCurrency\": \"DOP\",\n      \"rate\": 59.17,\n      \"effectiveAt\": \"{{usdToDopEffectiveAt}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Create FX Destination Account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clientId = pm.collectionVariables.get('clientId') || pm.environment.get('clientId') || pm.variables.get('clientId');",
+                  "if (!clientId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('clientId is empty. Run Create Client first.');",
+                  "}",
+                  "const suffix = String(Date.now()).slice(-8);",
+                  "const uniqueFxAccountNumber = `USD${suffix}`;",
+                  "pm.variables.set('clientId', clientId);",
+                  "pm.collectionVariables.set('uniqueFxAccountNumber', uniqueFxAccountNumber);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.createAccount).to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('fxDestinationAccountId', response.data.createAccount.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('fxDestinationAccountId', response.data.createAccount.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateAccount($input: CreateAccountInput!) { createAccount(input: $input) { id clientId accountNumber alias currency balance status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"clientId\": \"{{clientId}}\",\n      \"accountNumber\": \"{{uniqueFxAccountNumber}}\",\n      \"alias\": \"Cuenta USD destino\",\n      \"currency\": \"USD\",\n      \"balance\": 0,\n      \"status\": \"ACTIVE\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Convert DOP to USD",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const effectiveAt = pm.collectionVariables.get('dopToUsdEffectiveAt') || pm.environment.get('dopToUsdEffectiveAt');",
+                  "if (!effectiveAt) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('dopToUsdEffectiveAt is empty. Run Create DOP to USD Rate first.');",
+                  "}",
+                  "pm.variables.set('dopToUsdEffectiveAt', effectiveAt);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('query returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.convertCurrency).to.exist;",
+                  "});",
+                  "pm.test('conversion returns converted amount', function () {",
+                  "  const conversion = response.data.convertCurrency;",
+                  "  pm.expect(conversion.baseCurrency).to.eql('DOP');",
+                  "  pm.expect(conversion.quoteCurrency).to.eql('USD');",
+                  "  pm.expect(conversion.convertedAmount).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query ConvertCurrency($input: ConvertCurrencyInput!) { convertCurrency(input: $input) { baseCurrency quoteCurrency amount rate convertedAmount effectiveAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"baseCurrency\": \"DOP\",\n      \"quoteCurrency\": \"USD\",\n      \"amount\": 1000,\n      \"effectiveAt\": \"{{dopToUsdEffectiveAt}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        }
+      ]
+    },
+    {
       "name": "transacciones",
       "item": [
         {
@@ -831,7 +1108,7 @@
                   "});",
                   "pm.test('deposit completed with balance snapshots', function () {",
                   "  const tx = response.data.createTransaction;",
-                  "  pm.expect(tx.type).to.eql('deposit');",
+                  "  pm.expect(tx.type).to.eql('DEPOSIT');",
                   "  pm.expect(tx.status).to.eql('COMPLETED');",
                   "  pm.expect(tx.sourceCurrentBalance).to.be.above(tx.sourcePreviousBalance);",
                   "});",
@@ -850,7 +1127,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"type\": \"deposit\",\n      \"channel\": \"web\",\n      \"currency\": \"DOP\",\n      \"amount\": 500,\n      \"reference\": \"{{depositReference}}\",\n      \"description\": \"Deposito completado\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
+              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"type\": \"deposit\",\n      \"channel\": \"web\",\n      \"currency\": \"DOP\",\n      \"amount\": 500,\n      \"reference\": \"{{depositReference}}\",\n      \"description\": \"Deposito completado\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -895,7 +1172,7 @@
                   "});",
                   "pm.test('withdrawal completed with lower balance', function () {",
                   "  const tx = response.data.createTransaction;",
-                  "  pm.expect(tx.type).to.eql('withdrawal');",
+                  "  pm.expect(tx.type).to.eql('WITHDRAWAL');",
                   "  pm.expect(tx.status).to.eql('COMPLETED');",
                   "  pm.expect(tx.sourceCurrentBalance).to.be.below(tx.sourcePreviousBalance);",
                   "});",
@@ -914,7 +1191,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"type\": \"withdrawal\",\n      \"channel\": \"atm\",\n      \"currency\": \"DOP\",\n      \"amount\": 100,\n      \"reference\": \"{{withdrawalReference}}\",\n      \"description\": \"Retiro completado\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
+              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"type\": \"withdrawal\",\n      \"channel\": \"atm\",\n      \"currency\": \"DOP\",\n      \"amount\": 100,\n      \"reference\": \"{{withdrawalReference}}\",\n      \"description\": \"Retiro completado\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -961,14 +1238,17 @@
                   "});",
                   "pm.test('transfer completed with source and destination snapshots', function () {",
                   "  const tx = response.data.createTransaction;",
-                  "  pm.expect(tx.type).to.eql('transfer');",
+                  "  pm.expect(tx.type).to.eql('TRANSFER');",
                   "  pm.expect(tx.status).to.eql('COMPLETED');",
                   "  pm.expect(tx.sourceCurrentBalance).to.be.below(tx.sourcePreviousBalance);",
                   "  pm.expect(tx.destinationCurrentBalance).to.be.above(tx.destinationPreviousBalance);",
                   "});",
                   "pm.collectionVariables.set('transactionId', response.data.createTransaction.id);",
                   "pm.collectionVariables.set('transferTransactionId', response.data.createTransaction.id);",
+                  "pm.variables.set('transactionId', response.data.createTransaction.id);",
+                  "pm.variables.set('transferTransactionId', response.data.createTransaction.id);",
                   "if (pm.environment) {",
+                  "  pm.environment.set('transactionId', response.data.createTransaction.id);",
                   "  pm.environment.set('transferTransactionId', response.data.createTransaction.id);",
                   "}"
                 ]
@@ -985,7 +1265,85 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"destinationAccountId\": \"{{destinationAccountId}}\",\n      \"type\": \"transfer\",\n      \"channel\": \"mobile\",\n      \"currency\": \"DOP\",\n      \"amount\": 200,\n      \"reference\": \"{{transferReference}}\",\n      \"description\": \"Transferencia completada\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
+              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"destinationAccountId\": \"{{destinationAccountId}}\",\n      \"type\": \"transfer\",\n      \"channel\": \"mobile\",\n      \"currency\": \"DOP\",\n      \"amount\": 200,\n      \"reference\": \"{{transferReference}}\",\n      \"description\": \"Transferencia completada\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/graphql"
+          }
+        },
+        {
+          "name": "Create FX Transfer DOP to USD",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const sourceAccountId = pm.collectionVariables.get('sourceAccountId') || pm.environment.get('sourceAccountId') || pm.variables.get('sourceAccountId');",
+                  "const fxDestinationAccountId = pm.collectionVariables.get('fxDestinationAccountId') || pm.environment.get('fxDestinationAccountId') || pm.variables.get('fxDestinationAccountId');",
+                  "if (!sourceAccountId || !fxDestinationAccountId) {",
+                  "  postman.setNextRequest(null);",
+                  "  throw new Error('sourceAccountId or fxDestinationAccountId is empty. Run Create Account and Create FX Destination Account first.');",
+                  "}",
+                  "const suffix = String(Date.now()).slice(-8);",
+                  "const reference = `FX-${suffix}`;",
+                  "pm.variables.set('sourceAccountId', sourceAccountId);",
+                  "pm.variables.set('fxDestinationAccountId', fxDestinationAccountId);",
+                  "pm.collectionVariables.set('fxTransferReference', reference);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('mutation returned no GraphQL errors', function () {",
+                  "  pm.expect(response.errors, JSON.stringify(response.errors || [])).to.be.undefined;",
+                  "  pm.expect(response.data.createTransaction).to.exist;",
+                  "});",
+                  "pm.test('fx transfer stores exchange info', function () {",
+                  "  const tx = response.data.createTransaction;",
+                  "  pm.expect(tx.type).to.eql('TRANSFER');",
+                  "  pm.expect(tx.exchangeDetails).to.exist;",
+                  "  pm.expect(tx.exchangeDetails.rate).to.be.a('number');",
+                  "  pm.expect(tx.exchangeDetails.convertedAmount).to.be.a('number');",
+                  "  pm.expect(tx.destinationCurrentBalance).to.be.above(tx.destinationPreviousBalance);",
+                  "});",
+                  "pm.collectionVariables.set('fxTransactionId', response.data.createTransaction.id);",
+                  "pm.collectionVariables.set('transferTransactionId', response.data.createTransaction.id);",
+                  "pm.collectionVariables.set('transactionId', response.data.createTransaction.id);",
+                  "pm.variables.set('fxTransactionId', response.data.createTransaction.id);",
+                  "pm.variables.set('transferTransactionId', response.data.createTransaction.id);",
+                  "pm.variables.set('transactionId', response.data.createTransaction.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('fxTransactionId', response.data.createTransaction.id);",
+                  "  pm.environment.set('transferTransactionId', response.data.createTransaction.id);",
+                  "  pm.environment.set('transactionId', response.data.createTransaction.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateTransaction($input: CreateTransactionInput!) { createTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"sourceAccountId\": \"{{sourceAccountId}}\",\n      \"destinationAccountId\": \"{{fxDestinationAccountId}}\",\n      \"type\": \"transfer\",\n      \"channel\": \"mobile\",\n      \"currency\": \"DOP\",\n      \"amount\": 300,\n      \"reference\": \"{{fxTransferReference}}\",\n      \"description\": \"Transferencia DOP a USD\",\n      \"status\": \"COMPLETED\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1003,12 +1361,17 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const transactionId = pm.collectionVariables.get('transferTransactionId') || pm.environment.get('transferTransactionId') || pm.variables.get('transferTransactionId');",
+                  "const transactionId = pm.collectionVariables.get('transferTransactionId') || pm.environment.get('transferTransactionId') || pm.variables.get('transferTransactionId') || pm.collectionVariables.get('fxTransactionId') || pm.environment.get('fxTransactionId') || pm.variables.get('fxTransactionId') || pm.collectionVariables.get('transactionId') || pm.environment.get('transactionId') || pm.variables.get('transactionId');",
                   "if (!transactionId) {",
                   "  postman.setNextRequest(null);",
-                  "  throw new Error('transferTransactionId is empty. Run Create Transfer Completed first.');",
+                  "  throw new Error('transactionId is empty. Run Create Transfer Completed or Create FX Transfer DOP to USD first.');",
                   "}",
-                  "pm.variables.set('transactionId', transactionId);"
+                  "pm.variables.set('transactionId', transactionId);",
+                  "pm.variables.set('transferTransactionId', transactionId);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('transactionId', transactionId);",
+                  "  pm.environment.set('transferTransactionId', transactionId);",
+                  "}"
                 ]
               }
             },
@@ -1031,7 +1394,14 @@
                   "  pm.expect(tx.sourceCurrentBalance).to.be.above(tx.sourcePreviousBalance);",
                   "  pm.expect(tx.destinationCurrentBalance).to.be.below(tx.destinationPreviousBalance);",
                   "});",
-                  "pm.collectionVariables.set('transactionId', response.data.updateTransaction.id);"
+                  "pm.collectionVariables.set('transactionId', response.data.updateTransaction.id);",
+                  "pm.collectionVariables.set('transferTransactionId', response.data.updateTransaction.id);",
+                  "pm.variables.set('transactionId', response.data.updateTransaction.id);",
+                  "pm.variables.set('transferTransactionId', response.data.updateTransaction.id);",
+                  "if (pm.environment) {",
+                  "  pm.environment.set('transactionId', response.data.updateTransaction.id);",
+                  "  pm.environment.set('transferTransactionId', response.data.updateTransaction.id);",
+                  "}"
                 ]
               }
             }
@@ -1046,7 +1416,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation UpdateTransaction($input: UpdateTransactionInput!) { updateTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"id\": \"{{transactionId}}\",\n      \"status\": \"REVERSED\"\n    }\n  }\n}",
+              "raw": "{\n  \"query\": \"mutation UpdateTransaction($input: UpdateTransactionInput!) { updateTransaction(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"id\": \"{{transactionId}}\",\n      \"status\": \"REVERSED\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1092,7 +1462,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query { transactions { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\"\n}",
+              "raw": "{\n  \"query\": \"query { transactions { id sourceAccountId destinationAccountId type channel currency amount exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1110,7 +1480,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const transactionId = pm.collectionVariables.get('transactionId') || pm.environment.get('transactionId') || pm.variables.get('transactionId');",
+                  "const transactionId = pm.collectionVariables.get('transactionId') || pm.environment.get('transactionId') || pm.variables.get('transactionId') || pm.collectionVariables.get('transferTransactionId') || pm.environment.get('transferTransactionId') || pm.variables.get('transferTransactionId') || pm.collectionVariables.get('fxTransactionId') || pm.environment.get('fxTransactionId') || pm.variables.get('fxTransactionId');",
                   "if (!transactionId) {",
                   "  postman.setNextRequest(null);",
                   "  throw new Error('transactionId is empty. Run Create Transaction first.');",
@@ -1157,7 +1527,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query Transaction($id: String!) { transaction(id: $id) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{transactionId}}\"\n  }\n}",
+              "raw": "{\n  \"query\": \"query Transaction($id: String!) { transaction(id: $id) { id sourceAccountId destinationAccountId type channel currency amount exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{transactionId}}\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1203,7 +1573,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query SearchTransactions($input: SearchTransactionsInput!) { searchTransactions(input: $input) { id sourceAccountId destinationAccountId type channel currency amount reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"term\": \"TRF\"\n    }\n  }\n}",
+              "raw": "{\n  \"query\": \"query SearchTransactions($input: SearchTransactionsInput!) { searchTransactions(input: $input) { id sourceAccountId destinationAccountId type channel currency amount exchangeDetails { transactionId baseCurrency quoteCurrency sourceAmount rate convertedAmount effectiveAt } reference description status sourcePreviousBalance sourceCurrentBalance destinationPreviousBalance destinationCurrentBalance createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"term\": \"TRF\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1330,6 +1700,38 @@
     },
     {
       "key": "transferTransactionId",
+      "value": ""
+    },
+    {
+      "key": "dopToUsdRateId",
+      "value": ""
+    },
+    {
+      "key": "dopToUsdEffectiveAt",
+      "value": ""
+    },
+    {
+      "key": "usdToDopRateId",
+      "value": ""
+    },
+    {
+      "key": "usdToDopEffectiveAt",
+      "value": ""
+    },
+    {
+      "key": "uniqueFxAccountNumber",
+      "value": ""
+    },
+    {
+      "key": "fxDestinationAccountId",
+      "value": ""
+    },
+    {
+      "key": "fxTransferReference",
+      "value": ""
+    },
+    {
+      "key": "fxTransactionId",
       "value": ""
     }
   ]
